@@ -23,6 +23,9 @@ transformers==4.48.3
 # Backbone (Qwen3-TTS)
 # transformers already covers this; specific version pinned above
 
+# Dataset download (HuggingFace)
+datasets==3.2.0
+
 # Data and analysis
 pandas==2.2.3
 pyarrow==18.1.0
