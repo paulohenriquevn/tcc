@@ -1,0 +1,45 @@
+# Stage 1.5 — Latent Separability Audit
+# Pin ALL versions for reproducibility. Never use >= or ~=.
+# Update date: 2026-02-19
+
+# Core ML
+torch==2.6.0
+torchaudio==2.6.0
+numpy==1.26.4
+scipy==1.14.1
+scikit-learn==1.6.1
+
+# Audio processing
+librosa==0.10.2.post1
+soundfile==0.13.1
+pyloudnorm==0.1.1
+
+# Speaker embeddings (ECAPA-TDNN)
+speechbrain==1.0.2
+
+# SSL features (WavLM)
+transformers==4.48.3
+
+# Backbone (Qwen3-TTS)
+# transformers already covers this; specific version pinned above
+
+# Data and analysis
+pandas==2.2.3
+pyarrow==18.1.0
+
+# Visualization
+matplotlib==3.10.0
+seaborn==0.13.2
+
+# Experiment tracking
+wandb==0.19.6
+
+# Reproducibility and hashing
+hashlib-additional==1.0.1
+
+# Testing
+pytest==8.3.4
+pytest-cov==6.0.0
+
+# Config
+pyyaml==6.0.2

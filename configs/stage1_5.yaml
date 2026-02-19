@@ -1,0 +1,148 @@
+# Stage 1.5 — Latent Separability Audit
+# Config YAML: single source of truth for all experiment parameters.
+# NEVER modify after experiment starts. New experiment = new config file.
+
+experiment:
+  name: "stage1_5_separability_audit"
+  description: "Probing latent representations for accent/speaker separability"
+  date: null  # filled at runtime
+  commit_hash: null  # filled at runtime
+
+# --- Seeds ---
+seed:
+  global: 42
+  robustness_seeds: [42, 1337, 7]  # minimum 3 seeds for CI
+
+# --- Dataset ---
+dataset:
+  name: "CORAA-MUPE"
+  version: null  # filled after manifest build
+  manifest_path: "data/manifest_v1.jsonl"
+  manifest_sha256: null  # filled after manifest build
+
+  filters:
+    speaker_type: "R"  # interviewees only
+    min_duration_s: 3.0
+    max_duration_s: 15.0
+    min_speakers_per_region: 8
+
+  accent_mapping: "birth_state_to_ibge_macro"
+  # N=Norte, NE=Nordeste, CO=Centro-Oeste, SE=Sudeste, S=Sul
+
+# --- Splits ---
+splits:
+  method: "speaker_disjoint"
+  ratios:
+    train: 0.7
+    val: 0.15
+    test: 0.15
+  seed: 42
+  output_dir: "data/splits/"
+  # Speakers are assigned to exactly one split.
+  # Assertions: train ∩ val = ∅, train ∩ test = ∅, val ∩ test = ∅
+
+# --- Feature Extraction ---
+features:
+  output_dir: "data/features/"
+
+  acoustic:
+    enabled: true
+    features: ["mfcc", "pitch_mean", "pitch_std", "energy_mean", "speech_rate"]
+    n_mfcc: 13
+
+  ecapa:
+    enabled: true
+    model: "speechbrain/spkrec-ecapa-voxceleb"
+    embedding_dim: 192
+    # SpeechBrain pre-trained, 192-dim output
+
+  ssl:
+    enabled: true
+    model: "microsoft/wavlm-large"
+    layers: [0, 6, 12, 18, 24]
+    pooling: "mean_temporal"
+
+  backbone:
+    enabled: true
+    model: "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+    layers: [0, 4, 8, 12, 16, 20, 24, 27]
+    pooling: "mean_temporal"
+    # 28 layers total, 8 probing points covering full depth
+
+# --- Probes ---
+probes:
+  model: "logistic_regression"
+  solver: "lbfgs"
+  max_iter: 1000
+  class_weight: "balanced"
+  multiclass: "multinomial"
+  regularization_C: [0.01, 0.1, 1.0, 10.0]  # sweep for robustness
+  default_C: 1.0
+
+  tasks:
+    accent:
+      target: "accent"
+      split: "speaker_disjoint"
+      # Probe predicts macro-region from latent features
+
+    speaker:
+      target: "speaker_id"
+      split: "stratified"
+      # Probe predicts speaker from latent features
+
+    leakage_a2s:
+      target: "speaker_id"
+      split: "stratified"
+      features: "accent_subspace"
+      # Tests if accent features leak speaker identity
+
+    leakage_s2a:
+      target: "accent"
+      split: "speaker_disjoint"
+      features: "speaker_subspace"
+      # Tests if speaker features leak accent info
+
+# --- Evaluation ---
+evaluation:
+  ci_method: "bootstrap"
+  ci_confidence: 0.95
+  bootstrap_n_samples: 1000
+
+  # Speaker similarity baseline
+  ecapa_baseline:
+    enabled: true
+    metric: "cosine_similarity"
+    # Measures intra-speaker and inter-speaker similarity on real audio
+
+  # Confound analysis
+  confounds:
+    accent_x_gender:
+      test: "chi_squared"
+      effect_size: "cramers_v"
+      threshold_blocker: 0.3  # Cramer's V >= 0.3 is BLOCKING
+    accent_x_duration:
+      test: "kruskal_wallis"
+      practical_diff_s: 1.0  # >1s difference = document as limitation
+
+# --- Thresholds (reference: TECHNICAL_VALIDATION_PROTOCOL.md) ---
+thresholds:
+  accent_probe:
+    go: 0.55
+    go_conditional: 0.50
+    fail: 0.50  # below this
+  leakage:
+    go_margin_pp: 5
+    conditional_margin_pp: 12
+    # FAIL if > chance + 12pp
+  speaker_similarity_drop:
+    go: 0.10  # < 10% drop
+    conditional: 0.15  # < 15% drop
+    # FAIL if >= 15% drop
+
+# --- Output ---
+output:
+  report_dir: "reports/"
+  report_md: "reports/stage1_5_report.md"
+  report_json: "reports/stage1_5_report.json"
+  figures_dir: "reports/figures/"
+  metrics_dir: "reports/metrics/"
