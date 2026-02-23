@@ -18,6 +18,7 @@ def _make_entry(speaker_id: str, accent: str, gender: str, duration_s: float, bi
         accent=accent,
         gender=gender,
         duration_s=duration_s,
+        sampling_rate=16000,
         text_id=None,
         source="CORAA-MUPE",
         birth_state=birth_state,
@@ -89,7 +90,7 @@ class TestAccentXDuration:
 
 
 class TestRunAllChecks:
-    def test_returns_two_results(self):
+    def test_returns_two_results_without_snr(self):
         entries = [
             _make_entry("s1", "SE", "M", 4.5, "SP"),
             _make_entry("s2", "SE", "F", 5.5, "SP"),
@@ -98,8 +99,19 @@ class TestRunAllChecks:
             _make_entry("s5", "S", "M", 5.0, "RS"),
             _make_entry("s6", "S", "F", 5.2, "RS"),
         ]
-        results = run_all_confound_checks(entries)
+        results = run_all_confound_checks(entries, check_snr=False)
 
         assert len(results) == 2
         assert results[0].variable_b == "gender"
         assert results[1].variable_b == "duration_s"
+
+    def test_returns_three_results_with_snr(self):
+        entries = [
+            _make_entry("s1", "SE", "M", 4.5, "SP"),
+            _make_entry("s2", "NE", "F", 6.0, "BA"),
+        ]
+        # SNR check will fail gracefully (audio files don't exist)
+        results = run_all_confound_checks(entries, check_snr=True)
+
+        assert len(results) == 3
+        assert results[2].variable_b == "snr_db"

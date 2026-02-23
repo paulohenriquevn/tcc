@@ -98,6 +98,7 @@ def compute_cosine_similarity(emb_a: np.ndarray, emb_b: np.ndarray) -> float:
 
 def compute_speaker_similarity_baseline(
     speaker_embeddings: dict[str, list[np.ndarray]],
+    seed: int = 42,
 ) -> dict[str, dict]:
     """Compute intra-speaker and inter-speaker similarity baselines.
 
@@ -125,7 +126,7 @@ def compute_speaker_similarity_baseline(
     # Sample pairs to keep computation manageable
     speakers = list(speaker_embeddings.keys())
     inter_sims = []
-    rng = np.random.RandomState(42)
+    rng = np.random.RandomState(seed)
 
     max_inter_pairs = min(5000, len(speakers) * (len(speakers) - 1) // 2)
     pair_count = 0

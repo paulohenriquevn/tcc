@@ -123,6 +123,9 @@ evaluation:
     accent_x_duration:
       test: "kruskal_wallis"
       practical_diff_s: 1.0  # >1s difference = document as limitation
+    accent_x_snr:
+      test: "kruskal_wallis"
+      practical_diff_db: 5.0  # >5dB SNR difference = document as limitation
 
 # --- Thresholds (reference: docs/protocol/TECHNICAL_VALIDATION_PROTOCOL.md) ---
 thresholds:

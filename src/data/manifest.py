@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 
-# IBGE macro-region mapping: birth_state -> macro-region
+# IBGE macro-region mapping: birth_state abbreviation -> macro-region
 BIRTH_STATE_TO_MACRO_REGION: dict[str, str] = {
     # Norte (N)
     "AC": "N", "AM": "N", "AP": "N", "PA": "N", "RO": "N", "RR": "N", "TO": "N",
@@ -29,7 +29,63 @@ BIRTH_STATE_TO_MACRO_REGION: dict[str, str] = {
     "PR": "S", "RS": "S", "SC": "S",
 }
 
+# Full state names -> abbreviations (handles CORAA-MUPE-ASR format).
+# Includes both accented and unaccented variants for robustness.
+STATE_FULL_NAME_TO_ABBREV: dict[str, str] = {
+    "ACRE": "AC",
+    "ALAGOAS": "AL",
+    "AMAPÁ": "AP", "AMAPA": "AP",
+    "AMAZONAS": "AM",
+    "BAHIA": "BA",
+    "CEARÁ": "CE", "CEARA": "CE",
+    "DISTRITO FEDERAL": "DF",
+    "ESPÍRITO SANTO": "ES", "ESPIRITO SANTO": "ES",
+    "GOIÁS": "GO", "GOIAS": "GO",
+    "MARANHÃO": "MA", "MARANHAO": "MA",
+    "MATO GROSSO": "MT",
+    "MATO GROSSO DO SUL": "MS",
+    "MINAS GERAIS": "MG",
+    "PARÁ": "PA", "PARA": "PA",
+    "PARAÍBA": "PB", "PARAIBA": "PB",
+    "PARANÁ": "PR", "PARANA": "PR",
+    "PERNAMBUCO": "PE",
+    "PIAUÍ": "PI", "PIAUI": "PI",
+    "RIO DE JANEIRO": "RJ",
+    "RIO GRANDE DO NORTE": "RN",
+    "RIO GRANDE DO SUL": "RS",
+    "RONDÔNIA": "RO", "RONDONIA": "RO",
+    "RORAIMA": "RR",
+    "SANTA CATARINA": "SC",
+    "SÃO PAULO": "SP", "SAO PAULO": "SP",
+    "SERGIPE": "SE",
+    "TOCANTINS": "TO",
+}
+
 VALID_MACRO_REGIONS = {"N", "NE", "CO", "SE", "S"}
+
+
+def normalize_birth_state(raw_value: str) -> str | None:
+    """Normalize birth_state to a 2-letter abbreviation.
+
+    Handles both abbreviations ("SP") and full names ("São Paulo").
+
+    Args:
+        raw_value: Raw birth_state string from dataset.
+
+    Returns:
+        2-letter state abbreviation, or None if unrecognized.
+    """
+    val = raw_value.strip().upper()
+
+    # Already an abbreviation?
+    if val in BIRTH_STATE_TO_MACRO_REGION:
+        return val
+
+    # Full name?
+    if val in STATE_FULL_NAME_TO_ABBREV:
+        return STATE_FULL_NAME_TO_ABBREV[val]
+
+    return None
 
 
 @dataclass(frozen=True)
@@ -45,6 +101,7 @@ class ManifestEntry:
     accent: str              # IBGE macro-region: N, NE, CO, SE, S
     gender: str              # M or F
     duration_s: float        # Duration in seconds
+    sampling_rate: int       # Audio sampling rate in Hz (expected: 16000)
     text_id: Optional[str]   # Text/transcription identifier (if available)
     source: str              # Source dataset (e.g., "CORAA-MUPE")
     birth_state: str         # Original birth_state from metadata
@@ -64,6 +121,11 @@ class ManifestEntry:
         if self.duration_s <= 0:
             raise ValueError(
                 f"Invalid duration {self.duration_s}s for utt_id={self.utt_id}. "
+                f"Must be positive"
+            )
+        if self.sampling_rate <= 0:
+            raise ValueError(
+                f"Invalid sampling_rate {self.sampling_rate} for utt_id={self.utt_id}. "
                 f"Must be positive"
             )
 
@@ -202,5 +264,13 @@ def validate_manifest_consistency(entries: list[ManifestEntry]) -> list[str]:
     missing = VALID_MACRO_REGIONS - accents_present
     if missing:
         errors.append(f"Missing macro-regions: {missing}")
+
+    # Check sampling_rate uniformity
+    srs = {e.sampling_rate for e in entries}
+    if len(srs) > 1:
+        errors.append(
+            f"Non-uniform sampling rates detected: {srs}. "
+            f"All entries should have the same sampling rate."
+        )
 
     return errors

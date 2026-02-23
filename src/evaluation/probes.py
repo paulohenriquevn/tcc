@@ -190,6 +190,81 @@ def evaluate_probe_against_thresholds(
             return "FAIL"
 
 
+def train_selectivity_control(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    real_result: ProbeResult,
+    seed: int = 42,
+    n_permutations: int = 5,
+    C: float = 1.0,
+) -> dict:
+    """Run permutation baseline to measure probe selectivity.
+
+    Selectivity = real_accuracy - permuted_accuracy.
+    If selectivity is low, the probe may be memorizing rather than
+    detecting a real signal.
+
+    Args:
+        X_train: Training features.
+        y_train: Training labels.
+        X_test: Test features.
+        y_test: Test labels.
+        real_result: The ProbeResult from the real (unpermuted) probe.
+        seed: Random seed.
+        n_permutations: Number of permutation runs to average.
+        C: Regularization parameter.
+
+    Returns:
+        Dict with selectivity metrics:
+        {
+            'real_bal_acc': float,
+            'permuted_bal_acc_mean': float,
+            'permuted_bal_acc_std': float,
+            'selectivity_pp': float,  # difference in percentage points
+            'n_permutations': int,
+        }
+    """
+    rng = np.random.RandomState(seed)
+    permuted_accs = []
+
+    for i in range(n_permutations):
+        # Permute training labels (break signal, keep structure)
+        y_train_perm = rng.permutation(y_train)
+
+        clf = LogisticRegression(
+            C=C,
+            solver="lbfgs",
+            max_iter=1000,
+            class_weight="balanced",
+            random_state=seed + i,
+        )
+        clf.fit(X_train, y_train_perm)
+        y_pred_perm = clf.predict(X_test)
+        perm_acc = balanced_accuracy_score(y_test, y_pred_perm)
+        permuted_accs.append(perm_acc)
+
+    perm_mean = float(np.mean(permuted_accs))
+    perm_std = float(np.std(permuted_accs))
+    selectivity = (real_result.balanced_accuracy - perm_mean) * 100  # pp
+
+    logger.info(
+        f"Selectivity control for '{real_result.probe_name}': "
+        f"real={real_result.balanced_accuracy:.4f}, "
+        f"permuted={perm_mean:.4f}±{perm_std:.4f}, "
+        f"selectivity={selectivity:+.1f}pp"
+    )
+
+    return {
+        "real_bal_acc": real_result.balanced_accuracy,
+        "permuted_bal_acc_mean": perm_mean,
+        "permuted_bal_acc_std": perm_std,
+        "selectivity_pp": selectivity,
+        "n_permutations": n_permutations,
+    }
+
+
 def sweep_regularization(
     X_train: np.ndarray,
     y_train: np.ndarray,

@@ -7,8 +7,11 @@ from pathlib import Path
 import pytest
 
 from src.data.manifest import (
+    BIRTH_STATE_TO_MACRO_REGION,
+    STATE_FULL_NAME_TO_ABBREV,
     ManifestEntry,
     compute_file_hash,
+    normalize_birth_state,
     read_manifest,
     validate_manifest_consistency,
     write_manifest,
@@ -24,6 +27,7 @@ def _make_entry(**overrides) -> ManifestEntry:
         "accent": "SE",
         "gender": "M",
         "duration_s": 5.0,
+        "sampling_rate": 16000,
         "text_id": "txt_001",
         "source": "CORAA-MUPE",
         "birth_state": "SP",
@@ -138,3 +142,68 @@ class TestManifestConsistency:
         ]
         errors = validate_manifest_consistency(entries)
         assert any("multiple accents" in e for e in errors)
+
+
+class TestNormalizeBirthState:
+    """Tests for normalize_birth_state() — handles both abbreviations and full names."""
+
+    def test_abbreviation_returned_as_is(self):
+        """2-letter state abbreviation is returned unchanged."""
+        assert normalize_birth_state("SP") == "SP"
+        assert normalize_birth_state("RJ") == "RJ"
+        assert normalize_birth_state("AM") == "AM"
+
+    def test_full_name_accented(self):
+        """Full Portuguese name with accents resolves correctly."""
+        assert normalize_birth_state("São Paulo") == "SP"
+        assert normalize_birth_state("Pará") == "PA"
+        assert normalize_birth_state("Maranhão") == "MA"
+        assert normalize_birth_state("Ceará") == "CE"
+
+    def test_full_name_unaccented(self):
+        """Full name without accents resolves (handles CORAA-MUPE variants)."""
+        assert normalize_birth_state("SAO PAULO") == "SP"
+        assert normalize_birth_state("PARA") == "PA"
+        assert normalize_birth_state("MARANHAO") == "MA"
+
+    def test_case_insensitive(self):
+        """Lookup is case-insensitive."""
+        assert normalize_birth_state("são paulo") == "SP"
+        assert normalize_birth_state("minas gerais") == "MG"
+        assert normalize_birth_state("rio de janeiro") == "RJ"
+
+    def test_whitespace_stripped(self):
+        """Leading/trailing whitespace is ignored."""
+        assert normalize_birth_state("  SP  ") == "SP"
+        assert normalize_birth_state(" São Paulo ") == "SP"
+
+    def test_unknown_returns_none(self):
+        """Unrecognized values return None."""
+        assert normalize_birth_state("Unknown") is None
+        assert normalize_birth_state("") is None
+        assert normalize_birth_state("Brasil") is None
+
+    def test_all_abbreviations_have_macro_region(self):
+        """Every known abbreviation resolves and has a macro-region mapping."""
+        for abbrev in BIRTH_STATE_TO_MACRO_REGION:
+            result = normalize_birth_state(abbrev)
+            assert result == abbrev, f"Failed for {abbrev}"
+
+    def test_all_full_names_resolve(self):
+        """Every full name in the mapping resolves to a valid abbreviation."""
+        for full_name, expected_abbrev in STATE_FULL_NAME_TO_ABBREV.items():
+            result = normalize_birth_state(full_name)
+            assert result == expected_abbrev, f"Failed for {full_name}"
+
+    def test_distrito_federal(self):
+        """Multi-word state name: Distrito Federal."""
+        assert normalize_birth_state("Distrito Federal") == "DF"
+
+    def test_mato_grosso_do_sul(self):
+        """Multi-word state name with 'do': Mato Grosso do Sul."""
+        assert normalize_birth_state("Mato Grosso do Sul") == "MS"
+
+    def test_rio_grande_do_norte_vs_sul(self):
+        """Distinguish Rio Grande do Norte from Rio Grande do Sul."""
+        assert normalize_birth_state("Rio Grande do Norte") == "RN"
+        assert normalize_birth_state("Rio Grande do Sul") == "RS"

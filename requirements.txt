@@ -20,8 +20,8 @@ speechbrain==1.0.2
 # SSL features (WavLM)
 transformers==4.48.3
 
-# Backbone (Qwen3-TTS)
-# transformers already covers this; specific version pinned above
+# Backbone (Qwen3-TTS) — requires GPU, Colab only
+qwen-tts==1.0.1
 
 # Dataset download (HuggingFace)
 datasets==3.2.0
@@ -34,11 +34,8 @@ pyarrow==18.1.0
 matplotlib==3.10.0
 seaborn==0.13.2
 
-# Experiment tracking
-wandb==0.19.6
-
-# Reproducibility and hashing
-hashlib-additional==1.0.1
+# Experiment tracking (optional, for Stage 2+)
+# wandb==0.19.6
 
 # Testing
 pytest==8.3.4

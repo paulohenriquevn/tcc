@@ -7,6 +7,7 @@ from src.evaluation.probes import (
     ProbeResult,
     evaluate_probe_against_thresholds,
     train_linear_probe,
+    train_selectivity_control,
     sweep_regularization,
 )
 
@@ -178,6 +179,46 @@ class TestEvaluateThresholds:
             result, {"go_margin_pp": 5, "conditional_margin_pp": 12}
         )
         assert decision == "FAIL"
+
+
+class TestSelectivityControl:
+    def test_separable_data_has_high_selectivity(self):
+        X_train, y_train, X_test, y_test = _make_separable_data()
+
+        real_result = train_linear_probe(
+            X_train, y_train, X_test, y_test,
+            probe_name="test", feature_source="synthetic",
+            target="accent", split_type="speaker_disjoint",
+            compute_ci=False,
+        )
+
+        selectivity = train_selectivity_control(
+            X_train, y_train, X_test, y_test,
+            real_result=real_result,
+            n_permutations=3,
+        )
+
+        assert selectivity["selectivity_pp"] > 10  # Strong signal
+        assert selectivity["permuted_bal_acc_mean"] < real_result.balanced_accuracy
+
+    def test_random_data_has_low_selectivity(self):
+        X_train, y_train, X_test, y_test = _make_random_data()
+
+        real_result = train_linear_probe(
+            X_train, y_train, X_test, y_test,
+            probe_name="test", feature_source="synthetic",
+            target="accent", split_type="speaker_disjoint",
+            compute_ci=False,
+        )
+
+        selectivity = train_selectivity_control(
+            X_train, y_train, X_test, y_test,
+            real_result=real_result,
+            n_permutations=3,
+        )
+
+        # Selectivity should be near zero for random data
+        assert abs(selectivity["selectivity_pp"]) < 20
 
 
 class TestRegularizationSweep:

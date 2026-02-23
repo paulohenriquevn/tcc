@@ -15,6 +15,8 @@ Toda métrica usada DEVE ter definição formal documentada antes do primeiro us
 | **Accent Classification Accuracy** | Acurácia de classificador treinado em áudio real, avaliado em áudio gerado | [0, 1] | 1.0 | Transferência de sotaque |
 | **Leakage Probe (A→speaker)** | Acurácia de probe linear que prediz speaker a partir de embedding A | [0, 1] | chance level | Disentanglement A/S |
 | **Leakage Probe (S→accent)** | Acurácia de probe linear que prediz sotaque a partir de embedding S | [0, 1] | chance level | Disentanglement S/A |
+| **UTMOS** | Preditor neural de MOS (SpeechMOS, VoiceMOS Challenge). Sanity check de qualidade no áudio gerado | [1, 5] | 5.0 | Qualidade de síntese (Stage 2-3) |
+| **WER (Whisper-large-v3)** | Word Error Rate entre texto de entrada e transcrição Whisper do áudio gerado | [0, ∞) | 0.0 | Inteligibilidade de síntese (Stage 2-3) |
 | **MOS (Mean Opinion Score)** | Avaliação subjetiva de qualidade (se aplicável) | [1, 5] | 5.0 | Qualidade perceptual |
 
 ## Baselines Obrigatórios

@@ -61,9 +61,10 @@ Audio = TTS(texto, S, A)
 - Normalizar sampling rate e loudness.
 
 ### 4.3 Rótulo de sotaque
-- Usar **macro-regiões** (ex.: Norte/Nordeste, Sudeste, Sul);
+- Usar **macro-regiões IBGE**: N (Norte), NE (Nordeste), CO (Centro-Oeste), SE (Sudeste), S (Sul);
 - `birth_state` é tratado como **proxy**, não ground truth;
-- Não usar mais de 3 classes no piloto.
+- Stage 1.5 usa 5 macro-regiões para maximizar cobertura do espaço dialectal. Se distribuição de speakers for insuficiente em alguma região (< 8 speakers), colapsar para 3 macro-regiões (NE, SE, S) como fallback;
+- Decisão de manter ou reduzir classes é tomada após análise de distribuição no manifest, não a priori.
 
 ---
 
@@ -87,6 +88,7 @@ Antes de qualquer adaptação, medir:
 - saída do backbone sem LoRA;
 - classificador de sotaque (esperado: fraco);
 - ECAPA similarity intra-speaker;
+- WER via Whisper-large-v3 no áudio gerado pelo backbone sem LoRA (referência para seção 9.4);
 - métricas registradas como **baseline zero**.
 
 ---
@@ -175,7 +177,40 @@ Chance level: `1/N_classes` (1/N_speakers para A→speaker, 1/N_accents para S�
 
 ---
 
-### 9.4 Análise de Confounds (obrigatória antes de treinamento)
+### 9.4 Qualidade de Fala (sanity check — Stage 2-3)
+
+Métricas automáticas de qualidade aplicadas ao áudio **gerado** pelo pipeline com LoRA. Não se aplicam ao Stage 1.5 (áudio real).
+
+#### UTMOS (preditor neural de MOS)
+
+- Modelo: **UTMOS** (SpeechMOS, treinado no VoiceMOS Challenge);
+- Medir score médio das amostras geradas no conjunto controlado de avaliação (seção 8);
+- Reportar: média, desvio-padrão, CI 95%.
+
+| Decisão | Critério (UTMOS médio) |
+|---------|------------------------|
+| **GO** | >= 3.0 |
+| **ADJUST** | >= 2.5 e < 3.0 |
+| **FAIL** | < 2.5 |
+
+#### WER via Whisper (inteligibilidade)
+
+- Modelo: **Whisper-large-v3** (OpenAI);
+- Medir WER entre texto de entrada e transcrição do áudio gerado;
+- Comparar: WER do áudio gerado vs WER do áudio baseline (backbone sem LoRA);
+- Reportar: WER médio, CI 95%.
+
+| Decisão | Critério |
+|---------|----------|
+| **GO** | WER gerado <= WER baseline + 10 p.p. |
+| **ADJUST** | WER gerado > WER baseline + 10 p.p. e <= WER baseline + 20 p.p. |
+| **FAIL** | WER gerado > 50% (áudio ininteligível) |
+
+Nota: UTMOS e WER são **sanity checks** — garantem que o LoRA não degradou a qualidade/inteligibilidade do áudio. Não são métricas de avaliação de sotaque.
+
+---
+
+### 9.5 Análise de Confounds (obrigatória antes de treinamento)
 
 Verificar independência entre variável alvo (accent) e variáveis espúrias:
 
@@ -183,10 +218,11 @@ Verificar independência entre variável alvo (accent) e variáveis espúrias:
 |----------|-------|----------|
 | Accent x Gender | Chi-quadrado + Cramer's V | V < 0.3: aceitável (documentar). V >= 0.3: mitigação obrigatória ou BLOQUEANTE |
 | Accent x Duration | Kruskal-Wallis | p < 0.05 E diferença prática > 1s: documentar como limitação |
+| Accent x Recording conditions | Kruskal-Wallis (SNR estimado) | p < 0.05 E diferença prática > 5dB: documentar como limitação. O modelo pode aprender canal/ruído em vez de sotaque |
 
 Se confound detectado e não mitigado, qualquer resultado positivo é questionável.
 
-### 9.5 Baseline Speaker Similarity (obrigatório antes de adaptação)
+### 9.6 Baseline Speaker Similarity (obrigatório antes de adaptação)
 
 - Modelo: **ECAPA-TDNN** (SpeechBrain pré-treinado, embedding 192-dim);
 - Medir similaridade cosseno **intra-speaker** (mesmo speaker, utterances diferentes) no áudio real;
@@ -203,18 +239,24 @@ Se confound detectado e não mitigado, qualquer resultado positivo é questioná
 - Identidade preservada (queda < 10% na similaridade ECAPA);
 - Leakage <= chance + 5 p.p. em ambas as direções;
 - Confusion matrix não degenerada;
+- UTMOS >= 3.0 (Stage 2-3);
+- WER gerado <= WER baseline + 10 p.p. (Stage 2-3);
 - Todos os hard fail checks passaram (ver `KB_HARD_FAIL_RULES.md`).
 
 ### ADJUST
 - Accent balanced accuracy em zona GO_CONDITIONAL (>= 0.50, < 0.55);
 - OU leakage em zona condicional (> chance+5pp, <= chance+12pp);
 - OU identidade com queda entre 10-15%;
+- OU UTMOS entre 2.5 e 3.0 (Stage 2-3);
+- OU WER gerado > WER baseline + 10 p.p. mas <= WER baseline + 20 p.p. (Stage 2-3);
 - Sinal presente, ajustes identificáveis.
 
 ### FAIL
 - Accent balanced accuracy < 0.50 (abaixo de GO_CONDITIONAL);
 - OU leakage > chance + 12 p.p.;
 - OU identidade colapsa (queda >= 15%);
+- OU UTMOS < 2.5 (Stage 2-3);
+- OU WER > 50% — áudio ininteligível (Stage 2-3);
 - OU falha metodológica (ver `KB_HARD_FAIL_RULES.md`).
 
 ---

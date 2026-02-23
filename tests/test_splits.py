@@ -1,4 +1,4 @@
-"""Tests for speaker-disjoint split generation."""
+"""Tests for speaker-disjoint and stratified split generation."""
 
 import tempfile
 from pathlib import Path
@@ -9,9 +9,13 @@ from src.data.manifest import ManifestEntry
 from src.data.splits import (
     assert_speaker_disjoint,
     assign_entries_to_splits,
+    assign_entries_to_stratified_splits,
     generate_speaker_disjoint_splits,
+    generate_stratified_splits,
     load_splits,
+    load_stratified_splits,
     save_splits,
+    save_stratified_splits,
 )
 
 
@@ -33,6 +37,7 @@ def _make_entries(n_speakers_per_region: int = 4) -> list[ManifestEntry]:
                     accent=region,
                     gender="M" if spk_idx % 2 == 0 else "F",
                     duration_s=5.0 + utt_idx,
+                    sampling_rate=16000,
                     text_id=f"txt_{utt_counter:04d}",
                     source="CORAA-MUPE",
                     birth_state=state,
@@ -195,3 +200,71 @@ class TestAssignEntries:
 
         for entry in assigned["val"]:
             assert entry.speaker_id in val_speakers
+
+
+class TestStratifiedSplits:
+    def test_same_speakers_in_train_and_test(self):
+        entries = _make_entries(n_speakers_per_region=10)
+        split = generate_stratified_splits(entries, seed=42)
+
+        utt_map = {e.utt_id: e for e in entries}
+        train_speakers = {utt_map[uid].speaker_id for uid in split.train_utt_ids}
+        test_speakers = {utt_map[uid].speaker_id for uid in split.test_utt_ids}
+
+        assert train_speakers == test_speakers
+
+    def test_no_utterance_overlap(self):
+        entries = _make_entries(n_speakers_per_region=10)
+        split = generate_stratified_splits(entries, seed=42)
+
+        overlap = set(split.train_utt_ids) & set(split.test_utt_ids)
+        assert len(overlap) == 0
+
+    def test_all_utterances_assigned(self):
+        entries = _make_entries(n_speakers_per_region=10)
+        split = generate_stratified_splits(entries, seed=42)
+
+        total = len(split.train_utt_ids) + len(split.test_utt_ids)
+        assert total == len(entries)
+
+    def test_deterministic_with_same_seed(self):
+        entries = _make_entries(n_speakers_per_region=10)
+
+        s1 = generate_stratified_splits(entries, seed=42)
+        s2 = generate_stratified_splits(entries, seed=42)
+
+        assert s1.train_utt_ids == s2.train_utt_ids
+        assert s1.test_utt_ids == s2.test_utt_ids
+
+    def test_different_seeds_give_different_splits(self):
+        entries = _make_entries(n_speakers_per_region=10)
+
+        s1 = generate_stratified_splits(entries, seed=42)
+        s2 = generate_stratified_splits(entries, seed=1337)
+
+        assert s1.train_utt_ids != s2.train_utt_ids
+
+    def test_invalid_train_ratio_raises_error(self):
+        entries = _make_entries()
+        with pytest.raises(ValueError, match="train_ratio"):
+            generate_stratified_splits(entries, train_ratio=1.5)
+
+    def test_save_and_load_roundtrip(self):
+        entries = _make_entries(n_speakers_per_region=10)
+        split = generate_stratified_splits(entries, seed=42)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = save_stratified_splits(split, Path(tmpdir))
+            loaded = load_stratified_splits(path)
+
+            assert loaded.train_utt_ids == split.train_utt_ids
+            assert loaded.test_utt_ids == split.test_utt_ids
+            assert loaded.seed == split.seed
+
+    def test_assign_entries(self):
+        entries = _make_entries(n_speakers_per_region=10)
+        split = generate_stratified_splits(entries, seed=42)
+
+        assigned = assign_entries_to_stratified_splits(entries, split)
+        total = len(assigned["train"]) + len(assigned["test"])
+        assert total == len(entries)

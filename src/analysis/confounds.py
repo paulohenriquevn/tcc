@@ -1,12 +1,13 @@
-"""Confound analysis: accent x gender, accent x duration.
+"""Confound analysis: accent x gender, accent x duration, accent x SNR.
 
 These sanity checks are MANDATORY before any training.
-If accent correlates strongly with gender or duration,
-any positive result may be attributable to the confound.
+If accent correlates strongly with gender, duration, or recording
+conditions, any positive result may be attributable to the confound.
 """
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from scipy import stats
@@ -174,10 +175,149 @@ def analyze_accent_x_duration(
     )
 
 
+def estimate_snr_rms(audio_path: Path, sr: int = 16000) -> float:
+    """Estimate Signal-to-Noise Ratio using RMS energy and silence detection.
+
+    Simple approach: compute ratio of RMS in speech segments vs silence.
+    Uses a frame-level energy threshold to separate speech from silence.
+
+    Args:
+        audio_path: Path to audio file.
+        sr: Sampling rate for loading.
+
+    Returns:
+        Estimated SNR in dB. Higher = cleaner audio.
+    """
+    import librosa
+
+    y, _ = librosa.load(str(audio_path), sr=sr)
+
+    # Frame-level RMS
+    frame_length = int(0.025 * sr)  # 25ms frames
+    hop_length = int(0.010 * sr)    # 10ms hop
+    rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
+
+    if len(rms) == 0:
+        return 0.0
+
+    # Threshold: frames below 20th percentile are "silence"
+    threshold = np.percentile(rms, 20)
+    speech_rms = rms[rms > threshold]
+    noise_rms = rms[rms <= threshold]
+
+    if len(speech_rms) == 0 or len(noise_rms) == 0:
+        return 0.0
+
+    speech_power = np.mean(speech_rms ** 2)
+    noise_power = np.mean(noise_rms ** 2)
+
+    if noise_power == 0:
+        return 60.0  # very clean
+
+    snr_db = 10 * np.log10(speech_power / noise_power)
+    return float(snr_db)
+
+
+def analyze_accent_x_snr(
+    entries: list[ManifestEntry],
+    practical_diff_db: float = 5.0,
+) -> ConfoundResult:
+    """Test association between accent and recording conditions via SNR.
+
+    Estimates SNR per utterance and tests whether it differs across accents.
+    A significant difference suggests systematic recording quality variation
+    by region — the model might learn channel instead of accent.
+
+    Args:
+        entries: Manifest entries with audio_path fields.
+        practical_diff_db: Minimum practical SNR difference in dB.
+
+    Returns:
+        ConfoundResult with Kruskal-Wallis test on SNR.
+    """
+    # Estimate SNR per utterance
+    accent_snrs: dict[str, list[float]] = {}
+    for entry in entries:
+        audio_path = Path(entry.audio_path)
+        if not audio_path.exists():
+            logger.warning(f"Audio not found for SNR: {audio_path}")
+            continue
+        snr = estimate_snr_rms(audio_path)
+        accent_snrs.setdefault(entry.accent, []).append(snr)
+
+    if len(accent_snrs) < 2:
+        return ConfoundResult(
+            test_name="kruskal_wallis",
+            variable_a="accent",
+            variable_b="snr_db",
+            statistic=0.0,
+            p_value=1.0,
+            effect_size=0.0,
+            effect_size_name="epsilon_squared",
+            is_significant=False,
+            is_blocking=False,
+            interpretation="Insufficient data for SNR confound analysis.",
+        )
+
+    groups = [np.array(snrs) for snrs in accent_snrs.values()]
+    accents = list(accent_snrs.keys())
+
+    h_stat, p_value = stats.kruskal(*groups)
+
+    n = sum(len(g) for g in groups)
+    k = len(groups)
+    epsilon_sq = (h_stat - k + 1) / (n - k) if n > k else 0.0
+
+    means = {acc: np.mean(snrs) for acc, snrs in accent_snrs.items()}
+    max_diff = max(means.values()) - min(means.values())
+
+    is_significant = p_value < 0.05
+    is_blocking = is_significant and max_diff > practical_diff_db
+
+    if is_blocking:
+        interpretation = (
+            f"BLOCKING: Significant SNR difference across accents. "
+            f"Max mean diff = {max_diff:.1f}dB > {practical_diff_db}dB. "
+            f"Model might learn recording conditions as accent proxy."
+        )
+    elif is_significant:
+        interpretation = (
+            f"Statistically significant but small practical SNR diff = {max_diff:.1f}dB. "
+            f"epsilon² = {epsilon_sq:.4f}. Document as limitation."
+        )
+    else:
+        interpretation = (
+            f"No significant SNR difference (p={p_value:.4f}). "
+            f"Max mean diff = {max_diff:.1f}dB."
+        )
+
+    for acc in sorted(accents):
+        snrs = accent_snrs[acc]
+        logger.info(
+            f"  {acc}: n={len(snrs)}, mean_snr={np.mean(snrs):.1f}dB, "
+            f"std={np.std(snrs):.1f}dB"
+        )
+
+    return ConfoundResult(
+        test_name="kruskal_wallis",
+        variable_a="accent",
+        variable_b="snr_db",
+        statistic=h_stat,
+        p_value=p_value,
+        effect_size=epsilon_sq,
+        effect_size_name="epsilon_squared",
+        is_significant=is_significant,
+        is_blocking=is_blocking,
+        interpretation=interpretation,
+    )
+
+
 def run_all_confound_checks(
     entries: list[ManifestEntry],
     gender_blocking_threshold: float = 0.3,
     duration_practical_diff_s: float = 1.0,
+    snr_practical_diff_db: float = 5.0,
+    check_snr: bool = True,
 ) -> list[ConfoundResult]:
     """Run all mandatory confound analyses.
 
@@ -185,6 +325,8 @@ def run_all_confound_checks(
         entries: Manifest entries.
         gender_blocking_threshold: Cramer's V threshold.
         duration_practical_diff_s: Practical difference threshold.
+        snr_practical_diff_db: Practical SNR difference threshold in dB.
+        check_snr: Whether to run SNR analysis (requires audio files).
 
     Returns:
         List of ConfoundResult objects.
@@ -193,6 +335,9 @@ def run_all_confound_checks(
         analyze_accent_x_gender(entries, gender_blocking_threshold),
         analyze_accent_x_duration(entries, duration_practical_diff_s),
     ]
+
+    if check_snr:
+        results.append(analyze_accent_x_snr(entries, snr_practical_diff_db))
 
     blocking = [r for r in results if r.is_blocking]
     if blocking:

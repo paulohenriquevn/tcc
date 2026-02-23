@@ -15,6 +15,7 @@ from typing import Optional
 from src.data.manifest import (
     BIRTH_STATE_TO_MACRO_REGION,
     ManifestEntry,
+    normalize_birth_state,
     validate_manifest_consistency,
     write_manifest,
 )
@@ -80,14 +81,15 @@ def build_manifest_from_coraa(
             filter_stats["rejected_duration"] += 1
             continue
 
-        # Validate birth_state
-        birth_state = raw.get("birth_state", "").strip().upper()
-        if not birth_state:
+        # Validate birth_state (handles both "SP" and "São Paulo" formats)
+        raw_birth_state = raw.get("birth_state", "").strip()
+        if not raw_birth_state:
             filter_stats["rejected_missing_birth_state"] += 1
             continue
-        if birth_state not in BIRTH_STATE_TO_MACRO_REGION:
+        birth_state = normalize_birth_state(raw_birth_state)
+        if birth_state is None:
             filter_stats["rejected_unknown_state"] += 1
-            logger.warning(f"Unknown birth_state: '{birth_state}'")
+            logger.warning(f"Unknown birth_state: '{raw_birth_state}'")
             continue
 
         # Validate gender
@@ -107,6 +109,7 @@ def build_manifest_from_coraa(
             accent=accent,
             gender=gender,
             duration_s=duration,
+            sampling_rate=int(raw.get("sampling_rate", 16000)),
             text_id=raw.get("text_id"),
             source="CORAA-MUPE",
             birth_state=birth_state,
@@ -253,11 +256,12 @@ def build_manifest_from_hf_dataset(
             filter_stats["rejected_duration"] += 1
             continue
 
-        bs = (birth_states[idx] or "").strip().upper()
-        if not bs:
+        raw_bs = (birth_states[idx] or "").strip()
+        if not raw_bs:
             filter_stats["rejected_missing_birth_state"] += 1
             continue
-        if bs not in BIRTH_STATE_TO_MACRO_REGION:
+        bs = normalize_birth_state(raw_bs)
+        if bs is None:
             filter_stats["rejected_unknown_state"] += 1
             continue
 
@@ -285,7 +289,7 @@ def build_manifest_from_hf_dataset(
 
         speaker_id = str(row["speaker_code"])
         duration = float(row["duration"])
-        birth_state = row["birth_state"].strip().upper()
+        birth_state = normalize_birth_state(row["birth_state"])
         gender = row["speaker_gender"].strip().upper()
         accent = BIRTH_STATE_TO_MACRO_REGION[birth_state]
 
@@ -303,12 +307,13 @@ def build_manifest_from_hf_dataset(
         seen_utt_ids.add(utt_id)
 
         # Save audio to WAV
+        audio_sr = int(audio_data["sampling_rate"])
         wav_path = audio_output_dir / f"{utt_id}.wav"
         try:
             sf.write(
                 str(wav_path),
                 audio_data["array"],
-                audio_data["sampling_rate"],
+                audio_sr,
             )
         except Exception as e:
             filter_stats["rejected_audio_error"] += 1
@@ -322,6 +327,7 @@ def build_manifest_from_hf_dataset(
             accent=accent,
             gender=gender,
             duration_s=duration,
+            sampling_rate=audio_sr,
             text_id=None,
             source="CORAA-MUPE",
             birth_state=birth_state,
