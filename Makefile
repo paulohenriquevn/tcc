@@ -1,40 +1,22 @@
 # Stage 1.5 Pipeline — Latent Separability Audit
 # Usage: make stage15
 # Requires: Python 3.10+, GPU for backbone/SSL features
+#
+# NOTE: The primary execution environment is Google Colab via
+# notebooks/stage1_5_coraa_mupe.ipynb. These Make targets provide
+# an alternative local CLI using the companion repo's `stage1_5` tool.
+# Scripts in scripts/ will be implemented as the pipeline matures.
 
 PYTHON ?= python3
 CONFIG ?= configs/stage1_5.yaml
 SEED ?= 42
 
-.PHONY: stage15 manifest splits confounds features probes report clean test
+.PHONY: stage15 test clean
 
-# Full pipeline: one command to rule them all
-stage15: manifest splits confounds features probes report
-	@echo "Stage 1.5 pipeline complete. See reports/stage1_5_report.md"
-
-# Step 1: Build manifest from CORAA-MUPE
-manifest:
-	$(PYTHON) scripts/build_manifest.py --config $(CONFIG)
-
-# Step 2: Generate speaker-disjoint splits
-splits:
-	$(PYTHON) scripts/generate_splits.py --config $(CONFIG)
-
-# Step 3: Confound analysis (accent x gender, accent x duration)
-confounds:
-	$(PYTHON) scripts/analyze_confounds.py --config $(CONFIG)
-
-# Step 4: Extract all features (acoustic, ECAPA, WavLM, backbone)
-features:
-	$(PYTHON) scripts/extract_features.py --config $(CONFIG)
-
-# Step 5: Run probes (accent, speaker, leakage) with CI
-probes:
-	$(PYTHON) scripts/run_probes.py --config $(CONFIG)
-
-# Step 6: Generate reports
-report:
-	$(PYTHON) scripts/generate_report.py --config $(CONFIG)
+# Full pipeline (requires companion repo `accent-speaker-disentanglement`)
+stage15:
+	@echo "Run the full pipeline via: notebooks/stage1_5_coraa_mupe.ipynb (Colab)"
+	@echo "Or install the companion repo and use: stage1_5 run $(CONFIG)"
 
 # Run tests
 test:

@@ -1,13 +1,28 @@
+# Python
 .venv
 __pycache__
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+
+# Data & runtime artifacts (generated, not versioned)
+data/
+reports/
+experiments/
+
+# IDE & OS
 *.db
 *.sqlite3
 *.log
 .DS_Store
 .idea/
 .vscode/
-*.env   
-.claude
+*.env
+
+# Claude Code — version research infra, ignore runtime
+.claude/.venv/
+.claude/settings.local.json
+.claude/tasks/
+.claude/memory/
+.claude/worktrees/
