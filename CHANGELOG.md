@@ -7,6 +7,8 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 ## [Unreleased]
 
 ### Added
+- README.md na raiz como entry point do repositório para orientador, banca e pesquisadores (#3)
+- `docs/meetings/README.md` com índice das atas de reunião (#3)
 - Skill `deep-paper-search` para busca profunda de papers científicos com LlamaIndex RAG — Arxiv + PubMed, indexação local com embeddings HuggingFace, retrieval semântico sem LLM (#1)
 - Roteamento PAPER/LITERATURE/ARXIV/PUBMED para rafael-monteiro no head-research (#1)
 - Stage 1.5 no RESEARCH_ROADMAP.md com 6 experimentos, métricas e Definition of Done (#2)
@@ -20,6 +22,11 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 - Makefile com targets `stage15`, `manifest`, `splits`, `confounds`, `features`, `probes`, `report` (#2)
 
 ### Changed
+- Estrutura de documentação reorganizada: `docs/protocol/`, `docs/methodology/`, `docs/meetings/` (#3)
+- `pesquisas/` renomeado para `references/` com PDFs padronizados (autor-ano) (#3)
+- `.gitignore` seletivo para `.claude/`: infraestrutura de pesquisa agora versionada (agents, rules, skills, roadmap, changelog) (#3)
+- CHANGELOG.md movido de `.claude/` para raiz (convenção Keep a Changelog) (#3)
+- Makefile simplificado: targets fantasma removidos, aponta para notebook Colab (#3)
 - Thresholds unificados em TECHNICAL_VALIDATION_PROTOCOL.md como fonte autoritativa única (#2)
 - Métrica primária: balanced accuracy (F1-macro como secundária) — resolve contradição C4 (#2)
 - Leakage com thresholds tiered: GO ≤ chance+5pp, CONDITIONAL ≤ chance+12pp, FAIL > 12pp (#2)
@@ -29,5 +36,8 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 - CLAUDE.md: status corrigido de "in progress" para "pipeline em construção" (#2)
 
 ### Fixed
+- Referências cruzadas atualizadas após reorganização de diretórios (CLAUDE.md, stage1_5.yaml, STAGE_1.md, RESEARCH_ROADMAP.md) (#3)
+- Nome de arquivo com espaço corrigido: `EMOSTEER -TTS.pdf` → `emosteer-tts_xie-2025.pdf` (#3)
+- Typo corrigido: `Qwen_3_tecnical.pdf` → `qwen3-tts-technical_qwen-2026.pdf` (#3)
 - Contradições C2-C5 entre STAGE_1.md, TECHNICAL_VALIDATION_PROTOCOL.md e notebook resolvidas (#2)
 - Status falso em CLAUDE.md ("Stage 1.5 in progress") corrigido para refletir realidade (#2)
