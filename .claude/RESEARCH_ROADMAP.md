@@ -98,7 +98,7 @@ STAGE 1: BASELINE      STAGE 1.5: PROBING     STAGE 2: PILOTO        STAGE 3: AV
 
 ### Gate 1.5
 
-**Critérios (ver `TECHNICAL_VALIDATION_PROTOCOL.md` seções 9.1-9.5):**
+**Critérios (ver `docs/protocol/TECHNICAL_VALIDATION_PROTOCOL.md` seções 9.1-9.5):**
 
 | Decisão | Critério |
 |---------|----------|

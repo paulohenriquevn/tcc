@@ -93,7 +93,7 @@ Onde:
 ### Controlabilidade de sotaque
 - Métrica primária: **balanced accuracy** (nunca accuracy simples);
 - F1-macro reportada como métrica secundária;
-- Thresholds definidos em `TECHNICAL_VALIDATION_PROTOCOL.md` (seção 9.1):
+- Thresholds definidos em `TECHNICAL_VALIDATION_PROTOCOL.md` (mesma pasta, seção 9.1):
   - Stage 1.5 (probes lineares): GO >= 0.55, GO_CONDITIONAL >= 0.50, FAIL < 0.50;
   - Stage 2-3 (classificador externo em áudio gerado): acima do baseline com CI 95%.
 
@@ -107,7 +107,7 @@ Onde:
   - prever speaker a partir de `A`;
   - prever sotaque a partir de `S`;
 - **ambas** as direções obrigatórias;
-- thresholds em `TECHNICAL_VALIDATION_PROTOCOL.md` (seção 9.3):
+- thresholds em `TECHNICAL_VALIDATION_PROTOCOL.md` (mesma pasta, seção 9.3):
   - GO: <= chance + 5 p.p.;
   - GO_CONDITIONAL: <= chance + 12 p.p.;
   - FAIL: > chance + 12 p.p.

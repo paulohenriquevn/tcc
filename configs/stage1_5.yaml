@@ -124,7 +124,7 @@ evaluation:
       test: "kruskal_wallis"
       practical_diff_s: 1.0  # >1s difference = document as limitation
 
-# --- Thresholds (reference: TECHNICAL_VALIDATION_PROTOCOL.md) ---
+# --- Thresholds (reference: docs/protocol/TECHNICAL_VALIDATION_PROTOCOL.md) ---
 thresholds:
   accent_probe:
     go: 0.55

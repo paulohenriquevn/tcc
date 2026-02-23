@@ -20,7 +20,7 @@ The project follows a **Stage-Gate** model. Each Stage has a formal Gate decisio
 | **Stage 2** | Pilot: LoRA training, loss convergence, first results | Experiments 2.1–2.6 |
 | **Stage 3** | Evaluation: full metrics with CI 95%, leakage probes, red team | Experiments 3.1–3.6 |
 
-**Current status:** Stage 1 GO passed. Stage 1.5 (latent separability audit) — pipeline em construção. Nenhum resultado empírico ainda. Thresholds unificados adotados do template do mentor (ver `TECHNICAL_VALIDATION_PROTOCOL.md`).
+**Current status:** Stage 1 GO passed. Stage 1.5 (latent separability audit) — pipeline em construção. Nenhum resultado empírico ainda. Thresholds unificados adotados do template do mentor (ver `docs/protocol/TECHNICAL_VALIDATION_PROTOCOL.md`).
 
 Gate decisions are taken by the `protocol-gate` Agent Team (all 5 personas).
 
@@ -55,7 +55,7 @@ Five research personas coordinate work via `.claude/agents/`. Each has domain ex
 
 ## Validation Protocol (non-negotiable)
 
-Defined in `TECHNICAL_VALIDATION_PROTOCOL.md`. Three mandatory metrics:
+Defined in `docs/protocol/TECHNICAL_VALIDATION_PROTOCOL.md`. Three mandatory metrics:
 
 1. **Accent controllability:** balanced accuracy of external classifier on generated audio (target: above baseline, non-degenerate confusion matrix)
 2. **Identity preservation:** ECAPA/x-vector cosine similarity, same speaker across accent changes (target: < 10% drop)
@@ -86,23 +86,36 @@ Defined in `TECHNICAL_VALIDATION_PROTOCOL.md`. Three mandatory metrics:
 ## Directory Layout
 
 ```
+CHANGELOG.md              # Project changelog (Keep a Changelog format)
+
+docs/
+├── protocol/             # Validation protocol and stage specifications
+│   ├── TECHNICAL_VALIDATION_PROTOCOL.md
+│   ├── STAGE_1.md
+│   ├── STAGE_2.md
+│   └── stage-gate-method.md
+├── methodology/
+│   └── PERSONAS.md       # Detailed persona profiles
+└── meetings/             # Meeting notes with decision records
+
+references/               # Literature: papers (PDFs) and dataset survey
+├── dataset-survey.md     # 36KB survey of pt-BR speech datasets
+├── emosteer-tts_xie-2025.pdf
+├── qwen3-tts-technical_qwen-2026.pdf
+└── segment-aware_liang-2026.pdf
+
+notebooks/                # Jupyter notebooks (execution on Colab)
+configs/                  # YAML experiment configs
+src/                      # Python source code
+tests/                    # Unit and integration tests
+
 .claude/
-├── agents/           # 6 persona definitions (head-research + 5 specialists)
-├── rules/            # 5 protocol files (dataset, experiment, metrics, pytorch, reproducibility)
-├── skills/           # 11 executable skills with SKILL.md each
-├── hooks/            # task-completed.sh, teammate-idle.sh
-├── AGENT_TEAMS.md    # Team composition patterns (experiment-review, data-quality-gate, protocol-gate, hostile-replication)
-├── RESEARCH_ROADMAP.md # 3-stage experimental plan with DoD per stage
-└── CHANGELOG.md      # Project changelog (Keep a Changelog format)
-
-notebooks/            # Jupyter notebooks (execution on Colab)
-pesquisas/            # Research papers and dataset analysis (dataset.md = 36KB survey)
-docs/                 # Documentation (WIP)
-
-TECHNICAL_VALIDATION_PROTOCOL.md  # Core validation requirements and decision criteria
-PERSONAS.md                       # Detailed persona profiles
-Stages.md                         # Stage-Gate methodology explanation
-STAGE_1.md, STAGE_2.md           # Detailed stage specifications
+├── agents/               # 6 persona definitions (head-research + 5 specialists)
+├── rules/                # 10 protocol files (dataset, experiment, metrics, pytorch, etc.)
+├── skills/               # 11 executable skills with SKILL.md each
+├── hooks/                # task-completed.sh, teammate-idle.sh
+├── AGENT_TEAMS.md        # Team composition patterns
+└── RESEARCH_ROADMAP.md   # 3-stage experimental plan with DoD per stage
 ```
 
 ## Running Experiments
