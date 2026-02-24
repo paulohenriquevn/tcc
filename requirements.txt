@@ -1,6 +1,6 @@
 # Stage 1.5 — Latent Separability Audit
 # Pin ALL versions for reproducibility. Never use >= or ~=.
-# Update date: 2026-02-19
+# Update date: 2026-02-24
 
 # Core ML
 torch==2.6.0
@@ -21,7 +21,7 @@ speechbrain==1.0.2
 transformers==4.48.3
 
 # Backbone (Qwen3-TTS) — requires GPU, Colab only
-qwen-tts==1.0.1
+qwen-tts==0.1.1
 
 # Dataset download (HuggingFace)
 datasets==3.2.0

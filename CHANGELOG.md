@@ -6,6 +6,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 
 ## [Unreleased]
 
+### Fixed
+- `qwen-tts==1.0.1` no requirements.txt não existe no PyPI (versão especulativa) — corrigido para `qwen-tts==0.1.1` (latest real, Feb 2026). Sem esta correção `pip install -r requirements.txt` falha e nenhuma dependência posterior é instalada (#7)
+
 ### Added
 - Seção 9.4 (UTMOS + WER via Whisper) no TECHNICAL_VALIDATION_PROTOCOL.md como sanity checks de qualidade de fala para Stage 2-3, com thresholds GO/ADJUST/FAIL e integração nos critérios de decisão da seção 10 (#6)
 - UTMOS e WER na tabela formal de métricas em `metric-validation.md` (#6)
@@ -14,7 +17,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 - `STATE_FULL_NAME_TO_ABBREV` mapeamento de 27 estados brasileiros (54 variantes) em `manifest.py` (#5)
 - 11 testes unitários para `normalize_birth_state()` cobrindo siglas, nomes completos, case-insensitivity e edge cases (#5)
 - `smoke_test_backbone()` função diagnóstica para validar extração de features no Colab antes do pipeline (#5)
-- `qwen-tts==1.0.1` adicionado ao `requirements.txt` como dependência do backbone (#5)
+- `qwen-tts` adicionado ao `requirements.txt` como dependência do backbone (#5)
 - `generate_stratified_splits()` para splits onde mesmos speakers aparecem em train e test com utterances diferentes — necessário para leakage probe A→speaker (#4)
 - `StratifiedSplitInfo` dataclass com persistência JSON e roundtrip (save/load) (#4)
 - `train_selectivity_control()` permutation baseline no pipeline de probes — mede sinal real vs memorização (#4)
