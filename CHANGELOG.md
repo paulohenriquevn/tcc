@@ -8,6 +8,10 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 
 ### Fixed
 - `qwen-tts==1.0.1` no requirements.txt não existe no PyPI (versão especulativa) — corrigido para `qwen-tts==0.1.1` (latest real, Feb 2026). Sem esta correção `pip install -r requirements.txt` falha e nenhuma dependência posterior é instalada (#7)
+- `transformers==4.48.3` conflita com `qwen-tts==0.1.1` que hard-pina `transformers==4.57.3` — atualizado pin para `4.57.3`. Compatível com WavLM `AutoModel` (suportado desde ~4.12) e SpeechBrain (que não depende de transformers) (#7)
+
+### Added
+- `accelerate==1.12.0` pinado explicitamente — dependência transitiva de `qwen-tts==0.1.1`, agora versionada para reprodutibilidade (#7)
 
 ### Added
 - Seção 9.4 (UTMOS + WER via Whisper) no TECHNICAL_VALIDATION_PROTOCOL.md como sanity checks de qualidade de fala para Stage 2-3, com thresholds GO/ADJUST/FAIL e integração nos critérios de decisão da seção 10 (#6)

@@ -17,8 +17,11 @@ pyloudnorm==0.1.1
 # Speaker embeddings (ECAPA-TDNN)
 speechbrain==1.0.2
 
-# SSL features (WavLM)
-transformers==4.48.3
+# SSL features (WavLM) + Backbone (Qwen3-TTS)
+# transformers pinned to 4.57.3: required by qwen-tts==0.1.1 (hard dep).
+# Compatible with WavLM AutoModel (supported since transformers ~4.12).
+transformers==4.57.3
+accelerate==1.12.0
 
 # Backbone (Qwen3-TTS) — requires GPU, Colab only
 qwen-tts==0.1.1
