@@ -23,6 +23,65 @@ from src.data.manifest import (
 logger = logging.getLogger(__name__)
 
 
+def _filter_regions_by_speaker_count(
+    entries: list["ManifestEntry"],
+    min_speakers_per_region: int,
+) -> tuple[list["ManifestEntry"], dict[str, set], list[str]]:
+    """Drop regions with fewer than min_speakers_per_region speakers.
+
+    Implements the fallback described in TECHNICAL_VALIDATION_PROTOCOL.md §4.3:
+    if a region has < 8 speakers, drop it instead of hard-failing.
+
+    Returns:
+        Tuple of (filtered_entries, region_speakers_map, dropped_regions).
+
+    Raises:
+        ValueError: If no regions survive the filter.
+    """
+    region_speakers: dict[str, set] = {}
+    for entry in entries:
+        region_speakers.setdefault(entry.accent, set()).add(entry.speaker_id)
+
+    dropped_regions = []
+    kept_regions = []
+    for region, speakers in sorted(region_speakers.items()):
+        n_speakers = len(speakers)
+        if n_speakers < min_speakers_per_region:
+            dropped_regions.append(region)
+            logger.warning(
+                f"Region '{region}' has {n_speakers} speakers "
+                f"(minimum {min_speakers_per_region}). "
+                f"Dropping per protocol §4.3 fallback."
+            )
+        else:
+            kept_regions.append(region)
+            logger.info(
+                f"Region {region}: {n_speakers} speakers, "
+                f"{sum(1 for e in entries if e.accent == region)} utterances"
+            )
+
+    if not kept_regions:
+        raise ValueError(
+            "No regions have enough speakers after filtering. "
+            f"min_speakers_per_region={min_speakers_per_region}, "
+            f"all regions: {dict((r, len(s)) for r, s in region_speakers.items())}"
+        )
+
+    if dropped_regions:
+        logger.warning(
+            f"Dropped {len(dropped_regions)} regions: {dropped_regions}. "
+            f"Keeping {len(kept_regions)} regions: {kept_regions}."
+        )
+        entries = [e for e in entries if e.accent not in set(dropped_regions)]
+        # Rebuild region_speakers for kept regions only
+        region_speakers = {
+            r: s for r, s in region_speakers.items()
+            if r not in set(dropped_regions)
+        }
+
+    return entries, region_speakers, dropped_regions
+
+
 def build_manifest_from_coraa(
     metadata_path: Path,
     audio_dir: Path,
@@ -121,22 +180,11 @@ def build_manifest_from_coraa(
     for key, count in filter_stats.items():
         logger.info(f"  {key}: {count}")
 
-    # Validate speaker per region
-    region_speakers: dict[str, set] = {}
-    for entry in filtered:
-        region_speakers.setdefault(entry.accent, set()).add(entry.speaker_id)
-
-    for region, speakers in sorted(region_speakers.items()):
-        n_speakers = len(speakers)
-        if n_speakers < min_speakers_per_region:
-            raise ValueError(
-                f"Region '{region}' has {n_speakers} speakers, "
-                f"minimum is {min_speakers_per_region}"
-            )
-        logger.info(
-            f"Region {region}: {n_speakers} speakers, "
-            f"{sum(1 for e in filtered if e.accent == region)} utterances"
-        )
+    # Validate speaker per region (with fallback for insufficient regions)
+    filtered, region_speakers, dropped_regions = _filter_regions_by_speaker_count(
+        filtered, min_speakers_per_region
+    )
+    filter_stats["dropped_regions"] = dropped_regions
 
     # Validate manifest consistency
     errors = validate_manifest_consistency(filtered)
@@ -340,22 +388,11 @@ def build_manifest_from_hf_dataset(
 
     logger.info(f"Phase 2 complete: {len(filtered)} entries with audio saved")
 
-    # ── Validation ──
-    region_speakers: dict[str, set] = {}
-    for entry in filtered:
-        region_speakers.setdefault(entry.accent, set()).add(entry.speaker_id)
-
-    for region, speakers in sorted(region_speakers.items()):
-        n_speakers = len(speakers)
-        if n_speakers < min_speakers_per_region:
-            raise ValueError(
-                f"Region '{region}' has {n_speakers} speakers, "
-                f"minimum is {min_speakers_per_region}"
-            )
-        logger.info(
-            f"Region {region}: {n_speakers} speakers, "
-            f"{sum(1 for e in filtered if e.accent == region)} utterances"
-        )
+    # ── Validation (with fallback for insufficient regions) ──
+    filtered, region_speakers, dropped_regions = _filter_regions_by_speaker_count(
+        filtered, min_speakers_per_region
+    )
+    filter_stats["dropped_regions"] = dropped_regions
 
     errors = validate_manifest_consistency(filtered)
     if errors:

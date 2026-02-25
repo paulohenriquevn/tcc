@@ -9,6 +9,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 ### Fixed
 - `qwen-tts==1.0.1` no requirements.txt não existe no PyPI (versão especulativa) — corrigido para `qwen-tts==0.1.1` (latest real, Feb 2026). Sem esta correção `pip install -r requirements.txt` falha e nenhuma dependência posterior é instalada (#7)
 - `transformers==4.48.3` conflita com `qwen-tts==0.1.1` que hard-pina `transformers==4.57.3` — atualizado pin para `4.57.3`. Compatível com WavLM `AutoModel` (suportado desde ~4.12) e SpeechBrain (que não depende de transformers) (#7)
+- `torch.cuda.get_device_properties(0).total_mem` não existe em PyTorch — corrigido para `total_memory` no notebook cell 4 (#7)
+- Regiões com < 8 speakers (N, CO) causavam hard-fail no `manifest_builder.py` — implementado fallback do protocolo §4.3: regiões insuficientes são descartadas com warning, mantendo NE/SE/S (#7)
+
+### Changed
+- `manifest_builder.py`: validação de regiões extraída para `_filter_regions_by_speaker_count()` compartilhada entre `build_manifest_from_coraa()` e `build_manifest_from_hf_dataset()` — implementa fallback gracioso em vez de hard-fail (#7)
+- Notebook cell 8: exibe regiões descartadas e referência ao protocolo §4.3 (#7)
 
 ### Added
 - `accelerate==1.12.0` pinado explicitamente — dependência transitiva de `qwen-tts==0.1.1`, agora versionada para reprodutibilidade (#7)
