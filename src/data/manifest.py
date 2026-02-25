@@ -63,6 +63,69 @@ STATE_FULL_NAME_TO_ABBREV: dict[str, str] = {
 
 VALID_MACRO_REGIONS = {"N", "NE", "CO", "SE", "S"}
 
+# Common Voice free-text accent label -> IBGE macro-region.
+# CV accent field is user-submitted and noisy. This mapping covers known
+# regional demonyms, generic region names, and state abbreviations.
+CV_ACCENT_TO_MACRO_REGION: dict[str, str] = {
+    # Sudeste (SE)
+    "carioca": "SE", "paulistano": "SE", "paulista": "SE", "mineiro": "SE",
+    "capixaba": "SE", "fluminense": "SE",
+    # Sul (S)
+    "gaúcho": "S", "gaucho": "S", "catarinense": "S", "paranaense": "S",
+    "sulista": "S",
+    # Nordeste (NE)
+    "baiano": "NE", "cearense": "NE", "pernambucano": "NE", "recifense": "NE",
+    "nordestino": "NE", "paraibano": "NE", "potiguar": "NE", "sergipano": "NE",
+    "piauiense": "NE", "alagoano": "NE", "maranhense": "NE",
+    # Centro-Oeste (CO)
+    "goiano": "CO", "brasiliense": "CO", "mato-grossense": "CO",
+    "candango": "CO",
+    # Norte (N)
+    "paraense": "N", "amazonense": "N", "nortista": "N", "manauara": "N",
+    # Generic region names
+    "norte": "N", "nordeste": "NE", "centro-oeste": "CO",
+    "sudeste": "SE", "sul": "S",
+    "sotaque do sul": "S", "sotaque do nordeste": "NE",
+    "sotaque do sudeste": "SE", "sotaque do norte": "N",
+    # State abbreviations (lowercase for matching)
+    "sp": "SE", "rj": "SE", "mg": "SE", "es": "SE",
+    "rs": "S", "sc": "S", "pr": "S",
+    "ba": "NE", "ce": "NE", "pe": "NE", "pb": "NE", "rn": "NE",
+    "se": "NE", "al": "NE", "ma": "NE", "pi": "NE",
+    "go": "CO", "df": "CO", "ms": "CO", "mt": "CO",
+    "am": "N", "pa": "N", "ac": "N", "ap": "N",
+    "ro": "N", "rr": "N", "to": "N",
+}
+
+
+def normalize_cv_accent(raw_value: str) -> str | None:
+    """Normalize Common Voice accent label to IBGE macro-region.
+
+    Handles demonyms ("carioca" -> "SE"), region names ("nordeste" -> "NE"),
+    state abbreviations ("sp" -> "SE"), and falls back to normalize_birth_state()
+    for full state names ("São Paulo" -> "SP" -> "SE").
+
+    Args:
+        raw_value: Raw accent string from Common Voice dataset.
+
+    Returns:
+        IBGE macro-region code (N, NE, CO, SE, S), or None if unresolvable.
+    """
+    val = raw_value.strip().lower()
+    if not val:
+        return None
+
+    # Direct lookup in CV mapping
+    if val in CV_ACCENT_TO_MACRO_REGION:
+        return CV_ACCENT_TO_MACRO_REGION[val]
+
+    # Fallback: try to resolve as state name/abbreviation via existing function
+    state_abbrev = normalize_birth_state(raw_value)
+    if state_abbrev is not None:
+        return BIRTH_STATE_TO_MACRO_REGION.get(state_abbrev)
+
+    return None
+
 
 def normalize_birth_state(raw_value: str) -> str | None:
     """Normalize birth_state to a 2-letter abbreviation.
@@ -238,9 +301,10 @@ def validate_manifest_consistency(entries: list[ManifestEntry]) -> list[str]:
     """
     errors = []
 
-    # Check unique utt_ids
-    utt_ids = [e.utt_id for e in entries]
-    duplicates = {uid for uid in utt_ids if utt_ids.count(uid) > 1}
+    # Check unique utt_ids — O(n) via Counter instead of O(n²)
+    from collections import Counter
+    utt_counts = Counter(e.utt_id for e in entries)
+    duplicates = {uid for uid, count in utt_counts.items() if count > 1}
     if duplicates:
         errors.append(f"Duplicate utt_ids: {duplicates}")
 
@@ -259,11 +323,14 @@ def validate_manifest_consistency(entries: list[ManifestEntry]) -> list[str]:
             f"Speakers with multiple accents (must be 1): {inconsistent}"
         )
 
-    # Check accent coverage
+    # Check accent coverage: need at least 2 regions for classification.
+    # Exact region coverage is validated upstream by _filter_regions_by_speaker_count().
     accents_present = {e.accent for e in entries}
-    missing = VALID_MACRO_REGIONS - accents_present
-    if missing:
-        errors.append(f"Missing macro-regions: {missing}")
+    if len(accents_present) < 2:
+        errors.append(
+            f"Need at least 2 macro-regions for classification, "
+            f"found {len(accents_present)}: {accents_present}"
+        )
 
     # Check sampling_rate uniformity
     srs = {e.sampling_rate for e in entries}

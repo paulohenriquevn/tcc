@@ -115,17 +115,46 @@ class TestManifestIO:
 
 
 class TestManifestConsistency:
-    def test_valid_manifest_returns_no_errors(self):
+    def test_valid_manifest_with_3_regions_returns_no_errors(self):
+        """After protocol §4.3 fallback, 3 regions (NE, SE, S) is valid."""
         entries = [
             _make_entry(utt_id="u1", speaker_id="s1", accent="SE"),
             _make_entry(utt_id="u2", speaker_id="s1", accent="SE"),
             _make_entry(utt_id="u3", speaker_id="s2", accent="NE", birth_state="BA"),
             _make_entry(utt_id="u4", speaker_id="s3", accent="S", birth_state="RS"),
-            _make_entry(utt_id="u5", speaker_id="s4", accent="N", birth_state="AM"),
-            _make_entry(utt_id="u6", speaker_id="s5", accent="CO", birth_state="GO"),
         ]
         errors = validate_manifest_consistency(entries)
         assert errors == []
+
+    def test_valid_manifest_with_all_5_regions(self):
+        """All 5 IBGE regions is also valid."""
+        entries = [
+            _make_entry(utt_id="u1", speaker_id="s1", accent="SE"),
+            _make_entry(utt_id="u2", speaker_id="s2", accent="NE", birth_state="BA"),
+            _make_entry(utt_id="u3", speaker_id="s3", accent="S", birth_state="RS"),
+            _make_entry(utt_id="u4", speaker_id="s4", accent="N", birth_state="AM"),
+            _make_entry(utt_id="u5", speaker_id="s5", accent="CO", birth_state="GO"),
+        ]
+        errors = validate_manifest_consistency(entries)
+        assert errors == []
+
+    def test_valid_manifest_with_2_regions(self):
+        """Minimum 2 regions for classification."""
+        entries = [
+            _make_entry(utt_id="u1", speaker_id="s1", accent="SE"),
+            _make_entry(utt_id="u2", speaker_id="s2", accent="NE", birth_state="BA"),
+        ]
+        errors = validate_manifest_consistency(entries)
+        assert errors == []
+
+    def test_single_region_fails(self):
+        """Only 1 region is insufficient for classification."""
+        entries = [
+            _make_entry(utt_id="u1", speaker_id="s1", accent="SE"),
+            _make_entry(utt_id="u2", speaker_id="s2", accent="SE"),
+        ]
+        errors = validate_manifest_consistency(entries)
+        assert any("at least 2 macro-regions" in e for e in errors)
 
     def test_duplicate_utt_id_detected(self):
         entries = [

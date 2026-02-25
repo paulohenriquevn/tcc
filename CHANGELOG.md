@@ -6,7 +6,74 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 
 ## [Unreleased]
 
+### Added
+- `train_classifier()` agora aceita `resume_from: Path` para retomar treinamento de checkpoint — restaura model, optimizer, scaler e epoch (#12)
+- `label_to_idx` persistido em JSON no notebook do classificador para mapeamento reproduzível de labels (#12)
+- `tqdm==4.67.1` pinado explicitamente no `requirements.txt` — era dependência transitiva, agora versionada (#12)
+- Notebook `stage1_5`: seções "## 1. Download e Build Manifest" e "## 4. Feature Extraction", histograma de duração, e célula de gate decision com avaliação GO/ADJUST/FAIL estruturada (#12)
+- Notebook `accents_pt_br_classifier`: verificação de chance level antes da avaliação cross-source (#12)
+
+### Changed
+- Checkpoint do trainer agora inclui `scaler_state_dict` e `seed` para reprodutibilidade completa de estado (#12)
+- Trainer loga VRAM (allocated + peak) por epoch quando em GPU (#12)
+- `_bootstrap_ci()` agora aceita `seed` configurável — era hardcoded 42 (#12)
+- `configs/stage1_5.yaml`: `splits.output_dir` → `"data/splits/stage1_5/"` para evitar colisão com splits do classificador (#12)
+- `configs/accent_classifier.yaml`: `splits.output_dir` → `"data/splits/classifier/"` e adicionado filtro `speaker_type: "R"` ausente (#12)
+
 ### Fixed
+- Notebook `stage1_5`: células corrompidas (markdown contendo código Python) removidas — resíduo de edição posicional com cell_id shifting (#12)
+- Notebook `stage1_5`: célula de manifest build crashava com `NameError` quando cache existia — adicionado guard `if entries is None:` (#12)
+- Notebook `accents_pt_br_classifier`: `torch.load()` sem `weights_only=False` falhava no PyTorch 2.6 (checkpoints com dados não-tensor) (#12)
+- Notebook `accents_pt_br_classifier`: validação cross-source usava dados de treino como fallback (`coraa_train[:N]`) — corrigido para usar split de validação completo (speaker-disjoint) (#12)
+- `validate_manifest_consistency()` usava O(n²) `list.count()` para detecção de duplicatas — substituído por O(n) `Counter` (#12)
+- `n_permutations=5` em probes de seletividade era insuficiente para baseline confiável — aumentado para 50 (#12)
+
+### Added
+- `src/utils/platform.py` com `detect_platform()` e `setup_environment()` — detecção automática de Colab, Lightning.ai e local com paths e cache apropriados para cada plataforma (#11)
+- `scripts/lightning_setup.sh` — script de setup one-time para Lightning.ai Studios (clone, deps, GPU check, testes) (#11)
+
+### Changed
+- Notebooks (`stage1_5_coraa_mupe`, `accents_pt_br_dataset`, `accents_pt_br_classifier`): setup cells reescritas para detecção automática de plataforma — sem necessidade de alterar paths manualmente entre Colab, Lightning.ai e local (#11)
+- `notebooks/README.md`: guia de execução atualizado com instruções para Google Colab, Lightning.ai e execução local, incluindo tabela comparativa de plataformas (#11)
+
+### Added
+- Pacote `src/classifier/` com classificador externo de sotaque para avaliação de áudio gerado (Stages 2-3) — CNN 3-block e wav2vec2 fine-tuned, com trainer, inference e datasets (#9)
+- `AccentCNN` (mel-spectrogram → logits) e `AccentWav2Vec2` (waveform → logits) em `src/classifier/` (#9)
+- `train_classifier()` e `evaluate_classifier()` com early stopping, balanced accuracy, bootstrap CI 95%, class weighting (#9)
+- `load_classifier()`, `classify_audio()`, `classify_batch()` em `src/classifier/inference.py` para avaliação de áudio gerado (#9)
+- `MelSpectrogramDataset` e `WaveformDataset` para CNN e wav2vec2 respectivamente (#9)
+- `CV_ACCENT_TO_MACRO_REGION` e `normalize_cv_accent()` em `manifest.py` — mapeia labels de sotaque do Common Voice para macro-regiões IBGE (#9)
+- `build_manifest_from_common_voice()` em `src/data/cv_manifest_builder.py` — filtragem em duas fases para Common Voice PT, com prefixo `cv_` para IDs (#9)
+- `combine_manifests()` e `analyze_source_distribution()` em `src/data/combined_manifest.py` — merge de manifests multi-source com detecção de colisões (#9)
+- `analyze_accent_x_source()` em `confounds.py` — chi-squared test de confound accent × data source (Cramer's V), auto-executado quando múltiplas fontes detectadas (#9)
+- `configs/accent_classifier.yaml` com configuração completa do experimento de ablação CNN vs wav2vec2 (#9)
+- `notebooks/accents_pt_br_classifier.ipynb` — notebook Colab para construção do dataset Accents-PT-BR e treinamento dos classificadores (#9)
+- Testes: `test_cv_manifest_builder.py`, `test_classifier_models.py`, `test_classifier_datasets.py`, `test_classifier_trainer.py` (#9)
+- `notebooks/accents_pt_br_dataset.ipynb` — notebook Colab para pipeline completa de construção do Accents-PT-BR e publicação no HuggingFace Hub com dataset card, speaker-disjoint splits e verificação round-trip (#10)
+- `notebooks/README.md` — guia de execução dos 3 notebooks com pre-requisitos, ordem, troubleshooting e instrucoes de execucao local (#10)
+
+### Changed
+- `README.md` (raiz): seção "Como Executar" atualizada com tabela dos 3 notebooks e link para `notebooks/README.md` (#10)
+
+- `run_all_confound_checks()` agora inclui automaticamente análise accent × source quando múltiplas fontes são detectadas nos entries (#9)
+
+- `PipelineCache` em `src/data/cache.py` para persistência de manifest e features em Google Drive entre sessões Colab — usa hash SHA-256 dos filtros como chave de diretório, invalidação automática ao mudar config (#8)
+- `_filter_speakers_by_utterance_count()` em `manifest_builder.py` — descarta speakers com menos de N utterances antes de construir manifest (#8)
+- `min_utterances_per_speaker: 3` no config YAML (`dataset.filters`) (#8)
+- Seção `cache:` no config YAML com `enabled` e `drive_base` (#8)
+- Cell de montagem do Google Drive no notebook Colab (#8)
+- `tests/test_cache.py` com 15 testes para `PipelineCache` e `compute_filter_hash()` (#8)
+- `tests/test_manifest_builder.py` com 7 testes para `_filter_speakers_by_utterance_count()` (#8)
+
+### Changed
+- `validate_manifest_consistency()` em `manifest.py`: check de cobertura de regiões agora exige mínimo 2 (era 5 fixo) — compatível com fallback do protocolo §4.3 que descarta regiões com < 8 speakers (#8)
+- Notebook cells 7-8: manifest build agora é cache-aware — carrega do Drive se existir, senão faz download + build + salva (#8)
+- Notebook cells 15-18: extração de features agora é cache-aware — carrega NPZ do Drive se existir, senão extrai + salva (#8)
+- Notebook cell 31 (report): inclui `filter_hash` no JSON de saída para rastreabilidade (#8)
+- `build_manifest_from_coraa()` e `build_manifest_from_hf_dataset()`: novo parâmetro `min_utterances_per_speaker` com tracking em `filter_stats` (#8)
+
+### Fixed
+- `.gitignore` usava `data/` sem leading `/`, ignorando `src/data/` (pacote Python) além de `/data/` (artifacts) — corrigido para `/data/`, `/reports/`, `/experiments/` (#8)
 - `qwen-tts==1.0.1` no requirements.txt não existe no PyPI (versão especulativa) — corrigido para `qwen-tts==0.1.1` (latest real, Feb 2026). Sem esta correção `pip install -r requirements.txt` falha e nenhuma dependência posterior é instalada (#7)
 - `transformers==4.48.3` conflita com `qwen-tts==0.1.1` que hard-pina `transformers==4.57.3` — atualizado pin para `4.57.3`. Compatível com WavLM `AutoModel` (suportado desde ~4.12) e SpeechBrain (que não depende de transformers) (#7)
 - `torch.cuda.get_device_properties(0).total_mem` não existe em PyTorch — corrigido para `total_memory` no notebook cell 4 (#7)

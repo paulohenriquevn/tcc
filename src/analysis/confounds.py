@@ -312,14 +312,115 @@ def analyze_accent_x_snr(
     )
 
 
+def analyze_accent_x_source(
+    entries: list[ManifestEntry],
+    blocking_threshold: float = 0.3,
+) -> ConfoundResult:
+    """Test association between accent and data source using chi-squared.
+
+    When combining multiple corpora (e.g. CORAA-MUPE + Common Voice),
+    a strong accent×source correlation means the classifier might learn
+    recording conditions instead of accent.
+
+    Args:
+        entries: Manifest entries with accent and source fields.
+        blocking_threshold: Cramer's V threshold for blocking confound.
+
+    Returns:
+        ConfoundResult with chi-squared test and Cramer's V.
+
+    Raises:
+        ValueError: If fewer than 2 sources are present.
+    """
+    sources = sorted({e.source for e in entries})
+    if len(sources) < 2:
+        return ConfoundResult(
+            test_name="chi_squared",
+            variable_a="accent",
+            variable_b="source",
+            statistic=0.0,
+            p_value=1.0,
+            effect_size=0.0,
+            effect_size_name="cramers_v",
+            is_significant=False,
+            is_blocking=False,
+            interpretation=(
+                f"Only {len(sources)} source(s) present: {sources}. "
+                f"Accent x source analysis requires >= 2 sources."
+            ),
+        )
+
+    accents = sorted({e.accent for e in entries})
+
+    contingency = np.zeros((len(accents), len(sources)), dtype=int)
+    accent_idx = {a: i for i, a in enumerate(accents)}
+    source_idx = {s: i for i, s in enumerate(sources)}
+
+    for entry in entries:
+        contingency[accent_idx[entry.accent], source_idx[entry.source]] += 1
+
+    chi2, p_value, dof, expected = stats.chi2_contingency(contingency)
+
+    n = contingency.sum()
+    k = min(contingency.shape) - 1
+    cramers_v = np.sqrt(chi2 / (n * k)) if k > 0 and n > 0 else 0.0
+
+    is_significant = p_value < 0.05
+    is_blocking = cramers_v >= blocking_threshold
+
+    if is_blocking:
+        interpretation = (
+            f"BLOCKING: Cramer's V = {cramers_v:.3f} >= {blocking_threshold}. "
+            f"Strong association accent x source. Classifier may learn source, "
+            f"not accent. Cross-source evaluation is mandatory."
+        )
+    elif is_significant:
+        interpretation = (
+            f"Significant but acceptable: Cramer's V = {cramers_v:.3f} "
+            f"< {blocking_threshold}. Document as limitation."
+        )
+    else:
+        interpretation = (
+            f"No significant association (p={p_value:.4f}). "
+            f"Cramer's V = {cramers_v:.3f}."
+        )
+
+    logger.info(
+        f"Accent x Source: chi2={chi2:.2f}, p={p_value:.4f}, V={cramers_v:.3f}"
+    )
+    for acc in accents:
+        row = contingency[accent_idx[acc]]
+        logger.info(
+            f"  {acc}: "
+            + ", ".join(f"{s}={row[source_idx[s]]}" for s in sources)
+        )
+
+    return ConfoundResult(
+        test_name="chi_squared",
+        variable_a="accent",
+        variable_b="source",
+        statistic=chi2,
+        p_value=p_value,
+        effect_size=cramers_v,
+        effect_size_name="cramers_v",
+        is_significant=is_significant,
+        is_blocking=is_blocking,
+        interpretation=interpretation,
+    )
+
+
 def run_all_confound_checks(
     entries: list[ManifestEntry],
     gender_blocking_threshold: float = 0.3,
     duration_practical_diff_s: float = 1.0,
     snr_practical_diff_db: float = 5.0,
     check_snr: bool = True,
+    source_blocking_threshold: float = 0.3,
 ) -> list[ConfoundResult]:
     """Run all mandatory confound analyses.
+
+    Automatically includes accent×source analysis when multiple sources
+    are detected in the entries (e.g. CORAA-MUPE + Common Voice).
 
     Args:
         entries: Manifest entries.
@@ -327,6 +428,7 @@ def run_all_confound_checks(
         duration_practical_diff_s: Practical difference threshold.
         snr_practical_diff_db: Practical SNR difference threshold in dB.
         check_snr: Whether to run SNR analysis (requires audio files).
+        source_blocking_threshold: Cramer's V threshold for accent×source.
 
     Returns:
         List of ConfoundResult objects.
@@ -338,6 +440,17 @@ def run_all_confound_checks(
 
     if check_snr:
         results.append(analyze_accent_x_snr(entries, snr_practical_diff_db))
+
+    # Auto-detect multi-source data and run accent x source check
+    sources = {e.source for e in entries}
+    if len(sources) >= 2:
+        logger.info(
+            f"Multiple sources detected ({sources}), "
+            f"running accent x source confound analysis"
+        )
+        results.append(
+            analyze_accent_x_source(entries, source_blocking_threshold)
+        )
 
     blocking = [r for r in results if r.is_blocking]
     if blocking:

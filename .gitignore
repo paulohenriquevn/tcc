@@ -7,9 +7,10 @@ __pycache__
 .pytest_cache/
 
 # Data & runtime artifacts (generated, not versioned)
-data/
-reports/
-experiments/
+# Leading / = repo root only. Without it, src/data/ would also be ignored.
+/data/
+/reports/
+/experiments/
 
 # IDE & OS
 *.db

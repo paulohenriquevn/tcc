@@ -197,7 +197,7 @@ def train_selectivity_control(
     y_test: np.ndarray,
     real_result: ProbeResult,
     seed: int = 42,
-    n_permutations: int = 5,
+    n_permutations: int = 50,
     C: float = 1.0,
 ) -> dict:
     """Run permutation baseline to measure probe selectivity.

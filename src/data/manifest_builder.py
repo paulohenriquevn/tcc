@@ -82,6 +82,49 @@ def _filter_regions_by_speaker_count(
     return entries, region_speakers, dropped_regions
 
 
+def _filter_speakers_by_utterance_count(
+    entries: list["ManifestEntry"],
+    min_utterances: int,
+) -> tuple[list["ManifestEntry"], list[str]]:
+    """Drop speakers with fewer than min_utterances utterances.
+
+    Args:
+        entries: List of manifest entries.
+        min_utterances: Minimum utterances per speaker to keep.
+
+    Returns:
+        Tuple of (filtered_entries, dropped_speaker_ids).
+
+    Raises:
+        ValueError: If no entries survive the filter.
+    """
+    speaker_utts: dict[str, int] = {}
+    for entry in entries:
+        speaker_utts[entry.speaker_id] = speaker_utts.get(entry.speaker_id, 0) + 1
+
+    dropped_speakers = [
+        spk for spk, count in speaker_utts.items()
+        if count < min_utterances
+    ]
+
+    if dropped_speakers:
+        dropped_set = set(dropped_speakers)
+        logger.warning(
+            f"Dropping {len(dropped_speakers)} speakers with < {min_utterances} "
+            f"utterances (total utterances removed: "
+            f"{sum(speaker_utts[s] for s in dropped_speakers)})"
+        )
+        entries = [e for e in entries if e.speaker_id not in dropped_set]
+
+    if not entries:
+        raise ValueError(
+            f"No entries remain after filtering speakers with < {min_utterances} "
+            f"utterances. All speakers were below threshold."
+        )
+
+    return entries, dropped_speakers
+
+
 def build_manifest_from_coraa(
     metadata_path: Path,
     audio_dir: Path,
@@ -90,6 +133,7 @@ def build_manifest_from_coraa(
     min_duration_s: float = 3.0,
     max_duration_s: float = 15.0,
     min_speakers_per_region: int = 8,
+    min_utterances_per_speaker: int = 0,
 ) -> tuple[list[ManifestEntry], dict]:
     """Build manifest from CORAA-MUPE metadata.
 
@@ -186,6 +230,17 @@ def build_manifest_from_coraa(
     )
     filter_stats["dropped_regions"] = dropped_regions
 
+    # Filter speakers with too few utterances
+    if min_utterances_per_speaker > 0:
+        filtered, dropped_speakers = _filter_speakers_by_utterance_count(
+            filtered, min_utterances_per_speaker
+        )
+        filter_stats["rejected_few_utterances"] = len(dropped_speakers)
+        filter_stats["dropped_speakers"] = dropped_speakers
+    else:
+        filter_stats["rejected_few_utterances"] = 0
+        filter_stats["dropped_speakers"] = []
+
     # Validate manifest consistency
     errors = validate_manifest_consistency(filtered)
     if errors:
@@ -200,6 +255,10 @@ def build_manifest_from_coraa(
     logger.info(f"Manifest written to {output_path} (SHA-256: {sha256})")
 
     # Build stats
+    region_speakers_after = {}
+    for entry in filtered:
+        region_speakers_after.setdefault(entry.accent, set()).add(entry.speaker_id)
+
     stats = {
         "filter_stats": filter_stats,
         "manifest_sha256": sha256,
@@ -210,9 +269,9 @@ def build_manifest_from_coraa(
                     1 for e in filtered if e.accent == region
                 ),
             }
-            for region, speakers in sorted(region_speakers.items())
+            for region, speakers in sorted(region_speakers_after.items())
         },
-        "total_speakers": sum(len(s) for s in region_speakers.values()),
+        "total_speakers": sum(len(s) for s in region_speakers_after.values()),
         "total_utterances": len(filtered),
     }
 
@@ -227,6 +286,7 @@ def build_manifest_from_hf_dataset(
     min_duration_s: float = 3.0,
     max_duration_s: float = 15.0,
     min_speakers_per_region: int = 8,
+    min_utterances_per_speaker: int = 0,
 ) -> tuple[list[ManifestEntry], dict]:
     """Build manifest from a HuggingFace CORAA-MUPE dataset object.
 
@@ -394,6 +454,17 @@ def build_manifest_from_hf_dataset(
     )
     filter_stats["dropped_regions"] = dropped_regions
 
+    # Filter speakers with too few utterances
+    if min_utterances_per_speaker > 0:
+        filtered, dropped_speakers = _filter_speakers_by_utterance_count(
+            filtered, min_utterances_per_speaker
+        )
+        filter_stats["rejected_few_utterances"] = len(dropped_speakers)
+        filter_stats["dropped_speakers"] = dropped_speakers
+    else:
+        filter_stats["rejected_few_utterances"] = 0
+        filter_stats["dropped_speakers"] = []
+
     errors = validate_manifest_consistency(filtered)
     if errors:
         for error in errors:
@@ -406,6 +477,11 @@ def build_manifest_from_hf_dataset(
     sha256 = write_manifest(filtered, manifest_output_path)
     logger.info(f"Manifest written to {manifest_output_path} (SHA-256: {sha256})")
 
+    # Rebuild region_speakers after all filtering
+    region_speakers_after: dict[str, set] = {}
+    for entry in filtered:
+        region_speakers_after.setdefault(entry.accent, set()).add(entry.speaker_id)
+
     stats = {
         "filter_stats": filter_stats,
         "manifest_sha256": sha256,
@@ -416,9 +492,9 @@ def build_manifest_from_hf_dataset(
                     1 for e in filtered if e.accent == region
                 ),
             }
-            for region, speakers in sorted(region_speakers.items())
+            for region, speakers in sorted(region_speakers_after.items())
         },
-        "total_speakers": sum(len(s) for s in region_speakers.values()),
+        "total_speakers": sum(len(s) for s in region_speakers_after.values()),
         "total_utterances": len(filtered),
     }
 

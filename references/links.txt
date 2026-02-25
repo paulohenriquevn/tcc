@@ -1,0 +1,4 @@
+https://github.com/imxtx/awesome-controllable-speech-synthesis
+
+https://github.com/idiap/sdialog
+

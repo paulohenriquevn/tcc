@@ -1,0 +1,121 @@
+# Accent Classifier — Ablation CNN vs wav2vec2
+# Config YAML: single source of truth for all experiment parameters.
+# NEVER modify after experiment starts. New experiment = new config file.
+
+experiment:
+  name: "accent_classifier_ablation"
+  description: "External accent classifier for evaluating generated audio (Stages 2-3). Ablation: CNN vs wav2vec2."
+  date: null  # filled at runtime
+  commit_hash: null  # filled at runtime
+
+# --- Seeds ---
+seed:
+  global: 42
+  robustness_seeds: [42, 1337, 7]  # minimum 3 seeds for CI
+
+# --- Dataset ---
+dataset:
+  name: "Accents-PT-BR"
+  sources:
+    - name: "CORAA-MUPE"
+      hf_id: "nilc-nlp/CORAA-MUPE-ASR"
+      manifest_path: null  # filled at runtime
+    - name: "CommonVoice-PT"
+      hf_id: "mozilla-foundation/common_voice_17_0"
+      hf_lang: "pt"
+      manifest_path: null  # filled at runtime
+
+  combined_manifest_path: null  # filled at runtime
+  combined_manifest_sha256: null  # filled at runtime
+
+  filters:
+    speaker_type: "R"  # interviewees only (same filter as stage1_5)
+    min_duration_s: 3.0
+    max_duration_s: 15.0
+    min_speakers_per_region: 8
+    min_utterances_per_speaker: 3
+
+  accent_mapping: "ibge_macro_region"
+  # N=Norte, NE=Nordeste, CO=Centro-Oeste, SE=Sudeste, S=Sul
+
+# --- Splits ---
+splits:
+  method: "speaker_disjoint"
+  ratios:
+    train: 0.7
+    val: 0.15
+    test: 0.15
+  seed: 42
+  output_dir: "data/splits/classifier/"
+  # Speakers are assigned to exactly one split.
+  # Assertions: train ∩ val = ∅, train ∩ test = ∅, val ∩ test = ∅
+
+# --- CNN Classifier ---
+cnn:
+  enabled: true
+  n_mels: 80
+  max_frames: 300  # ~4.7s at hop_length=512, sr=16000
+  n_fft: 1024
+  hop_length: 512
+  conv_channels: [32, 64, 128]
+
+  training:
+    learning_rate: 0.001
+    batch_size: 32
+    n_epochs: 50
+    patience: 10  # early stopping on val balanced accuracy
+    use_amp: true
+
+# --- wav2vec2 Classifier ---
+wav2vec2:
+  enabled: true
+  model_name: "facebook/wav2vec2-base"
+  freeze_feature_extractor: true
+  max_length_s: 15.0
+
+  training:
+    learning_rate: 3.0e-5
+    batch_size: 8  # smaller for VRAM constraint (24GB)
+    n_epochs: 20
+    patience: 5
+    use_amp: true
+
+# --- Cross-Source Evaluation ---
+cross_source:
+  enabled: true
+  # Train on source A, test on source B (and vice versa)
+  # If both directions at chance -> classifier learned source, not accent
+
+# --- Confound Analysis ---
+confounds:
+  accent_x_gender:
+    test: "chi_squared"
+    effect_size: "cramers_v"
+    threshold_blocker: 0.3
+  accent_x_duration:
+    test: "kruskal_wallis"
+    practical_diff_s: 1.0
+  accent_x_source:
+    test: "chi_squared"
+    effect_size: "cramers_v"
+    threshold_blocker: 0.3
+
+# --- Evaluation ---
+evaluation:
+  ci_method: "bootstrap"
+  ci_confidence: 0.95
+  bootstrap_n_samples: 1000
+  primary_metric: "balanced_accuracy"
+  secondary_metrics: ["f1_macro", "per_class_recall"]
+
+# --- Output ---
+output:
+  checkpoint_dir: "experiments/accent_classifier/checkpoints/"
+  report_dir: "experiments/accent_classifier/reports/"
+  report_json: "experiments/accent_classifier/reports/ablation_report.json"
+  figures_dir: "experiments/accent_classifier/reports/figures/"
+
+# --- Cache (Google Drive persistence across Colab sessions) ---
+cache:
+  enabled: true
+  drive_base: "/content/drive/MyDrive/tcc-cache"

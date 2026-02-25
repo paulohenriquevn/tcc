@@ -25,6 +25,7 @@ dataset:
     min_duration_s: 3.0
     max_duration_s: 15.0
     min_speakers_per_region: 8
+    min_utterances_per_speaker: 3
 
   accent_mapping: "birth_state_to_ibge_macro"
   # N=Norte, NE=Nordeste, CO=Centro-Oeste, SE=Sudeste, S=Sul
@@ -37,7 +38,7 @@ splits:
     val: 0.15
     test: 0.15
   seed: 42
-  output_dir: "data/splits/"
+  output_dir: "data/splits/stage1_5/"
   # Speakers are assigned to exactly one split.
   # Assertions: train ∩ val = ∅, train ∩ test = ∅, val ∩ test = ∅
 
@@ -141,6 +142,11 @@ thresholds:
     go: 0.10  # < 10% drop
     conditional: 0.15  # < 15% drop
     # FAIL if >= 15% drop
+
+# --- Cache (Google Drive persistence across Colab sessions) ---
+cache:
+  enabled: true
+  drive_base: "/content/drive/MyDrive/tcc-cache"
 
 # --- Output ---
 output:

@@ -46,15 +46,23 @@ Detalhes do metodo: [`docs/protocol/stage-gate-method.md`](docs/protocol/stage-g
 
 ## Como Executar
 
-O ambiente primario de execucao e **Google Colab** (GPU). O notebook principal e [`notebooks/stage1_5_coraa_mupe.ipynb`](notebooks/stage1_5_coraa_mupe.ipynb).
+O ambiente primario de execucao e **Google Colab** (GPU). O guia completo de execucao esta em [`notebooks/README.md`](notebooks/README.md).
 
-Para execucao local:
+### Notebooks Disponiveis
+
+| Notebook | Objetivo | Tempo |
+|----------|----------|-------|
+| [`stage1_5_coraa_mupe.ipynb`](notebooks/stage1_5_coraa_mupe.ipynb) | Auditoria de separabilidade latente (probes lineares) | ~2-4h |
+| [`accents_pt_br_dataset.ipynb`](notebooks/accents_pt_br_dataset.ipynb) | Pipeline Accents-PT-BR + publicacao HuggingFace | ~3-5h |
+| [`accents_pt_br_classifier.ipynb`](notebooks/accents_pt_br_classifier.ipynb) | Ablation CNN vs wav2vec2 (classificador externo) | ~4-6h |
+
+### Execucao Local
 
 ```bash
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Rodar testes
+# Rodar testes (196 testes, sem GPU)
 make test
 ```
 

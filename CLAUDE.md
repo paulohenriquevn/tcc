@@ -107,6 +107,8 @@ references/               # Literature: papers (PDFs) and dataset survey
 notebooks/                # Jupyter notebooks (execution on Colab)
 configs/                  # YAML experiment configs
 src/                      # Python source code
+├── classifier/           # External accent classifier (CNN, wav2vec2) for Stages 2-3
+src/data/                 # Dataset, manifest, splits
 tests/                    # Unit and integration tests
 
 .claude/
