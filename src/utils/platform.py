@@ -1,13 +1,14 @@
 """Platform detection for multi-environment notebook support.
 
 Detects whether the notebook is running on Google Colab, Lightning.ai,
-or a local machine, and provides appropriate paths and setup functions.
+Paperspace Gradient, or a local machine, and provides appropriate paths
+and setup functions.
 
 Usage:
     from src.utils.platform import detect_platform, PlatformConfig
 
     platform = detect_platform()
-    print(platform.name)        # "colab", "lightning", or "local"
+    print(platform.name)        # "colab", "lightning", "paperspace", or "local"
     print(platform.cache_base)  # Platform-appropriate cache directory
 """
 
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 class PlatformConfig:
     """Platform-specific configuration for notebook execution."""
 
-    name: str                # "colab", "lightning", or "local"
+    name: str                # "colab", "lightning", "paperspace", or "local"
     repo_dir: Path           # Root of the cloned repository
     cache_base: Path         # Persistent cache directory for manifests/features
     has_gpu: bool            # Whether a GPU is available
@@ -39,8 +40,9 @@ def detect_platform(
 
     Detection order:
     1. Lightning.ai — /teamspace/studios/this_studio exists
-    2. Google Colab — google.colab module is importable
-    3. Local — fallback
+    2. Paperspace Gradient — PAPERSPACE env var is set
+    3. Google Colab — google.colab module is importable
+    4. Local — fallback
 
     Args:
         cache_override: Optional path to override the default cache location.
@@ -66,6 +68,23 @@ def detect_platform(
             needs_drive_mount=False,
         )
         logger.info("Platform: Lightning.ai (studio=%s)", lightning_studio)
+        return config
+
+    # Check Paperspace Gradient
+    # Gradient sets PAPERSPACE env var; /storage/ is persistent across instances
+    if os.environ.get("PAPERSPACE"):
+        repo_dir = Path("/notebooks/TCC")
+        storage_dir = Path("/storage")
+        cache_base = Path(cache_override) if cache_override else (storage_dir / "tcc-cache")
+        config = PlatformConfig(
+            name="paperspace",
+            repo_dir=repo_dir,
+            cache_base=cache_base,
+            has_gpu=has_gpu,
+            needs_clone=not (repo_dir / ".git").exists(),
+            needs_drive_mount=False,
+        )
+        logger.info("Platform: Paperspace Gradient (gpu=%s)", has_gpu)
         return config
 
     # Check Google Colab

@@ -12,6 +12,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 - `tqdm==4.67.1` pinado explicitamente no `requirements.txt` — era dependência transitiva, agora versionada (#12)
 - Notebook `stage1_5`: seções "## 1. Download e Build Manifest" e "## 4. Feature Extraction", histograma de duração, e célula de gate decision com avaliação GO/ADJUST/FAIL estruturada (#12)
 - Notebook `accents_pt_br_classifier`: verificação de chance level antes da avaliação cross-source (#12)
+- Suporte a Paperspace Gradient em `src/utils/platform.py` — detecção automática via env `PAPERSPACE`, cache em `/storage/tcc-cache` (#13)
 
 ### Changed
 - Checkpoint do trainer agora inclui `scaler_state_dict` e `seed` para reprodutibilidade completa de estado (#12)

@@ -1,6 +1,6 @@
 # Notebooks — Guia de Execucao
 
-Os notebooks suportam **Google Colab**, **Lightning.ai** e **execucao local**. A deteccao de plataforma e automatica (`src/utils/platform.py`) — nao e necessario alterar nenhum path manualmente. A logica de negocio esta em `src/` (testavel, auditavel) — os notebooks sao camadas de orquestracao que instalam dependencias, configuram ambiente, chamam modulos e exibem resultados.
+Os notebooks suportam **Google Colab**, **Lightning.ai**, **Paperspace Gradient** e **execucao local**. A deteccao de plataforma e automatica (`src/utils/platform.py`) — nao e necessario alterar nenhum path manualmente. A logica de negocio esta em `src/` (testavel, auditavel) — os notebooks sao camadas de orquestracao que instalam dependencias, configuram ambiente, chamam modulos e exibem resultados.
 
 ## Plataformas Suportadas
 
@@ -8,16 +8,17 @@ Os notebooks suportam **Google Colab**, **Lightning.ai** e **execucao local**. A
 |------------|-----|---------------------|-------|
 | **Google Colab** | T4/A100 (depende do plano) | Google Drive (~50 GB) | Abrir notebook no Colab |
 | **Lightning.ai** | L4 24GB (~21h/mes free) | 100 GB persistent disk | `bash scripts/lightning_setup.sh` |
+| **Paperspace Gradient** | A5000 24GB+ (depende do plano) | `/storage/` persistente | Criar notebook, clonar repo |
 | **Local** | NVIDIA com CUDA | Disco local | `pip install -r requirements.txt` |
 
 ## Pre-Requisitos
 
-| Requisito | Colab | Lightning.ai | Local |
-|-----------|-------|-------------|-------|
-| **GPU** | Runtime com GPU (T4 minimo) | L4 incluida no Studio | NVIDIA com CUDA |
-| **Storage** | Google Drive montado automaticamente | Persistent disk built-in | ~50 GB de disco |
-| **Conta HuggingFace** | Apenas para publicacao (`accents_pt_br_dataset.ipynb`) | Idem | Idem |
-| **Espaco em disco** | ~50 GB no Drive | ~50 GB no persistent disk | ~50 GB local |
+| Requisito | Colab | Lightning.ai | Paperspace | Local |
+|-----------|-------|-------------|------------|-------|
+| **GPU** | Runtime com GPU (T4 minimo) | L4 incluida no Studio | A5000+ (24 GB VRAM) | NVIDIA com CUDA |
+| **Storage** | Google Drive montado automaticamente | Persistent disk built-in | `/storage/` persistente | ~50 GB de disco |
+| **Conta HuggingFace** | Apenas para publicacao (`accents_pt_br_dataset.ipynb`) | Idem | Idem | Idem |
+| **Espaco em disco** | ~50 GB no Drive | ~50 GB no persistent disk | ~50 GB no `/storage/` | ~50 GB local |
 
 ## Notebooks Disponiveis
 
@@ -79,6 +80,27 @@ bash scripts/lightning_setup.sh
 - 100 GB de storage persistente (sem necessidade de Google Drive)
 - ~21h/mes de GPU gratuita
 - Sem restart de runtime por NumPy ABI (ambiente controlado)
+
+### Paperspace Gradient
+
+1. Criar um notebook no Paperspace Gradient com GPU A5000 (ou superior, 24 GB VRAM minimo)
+2. Abrir o terminal e clonar o repositorio:
+
+```bash
+git clone https://github.com/paulohenriquevn/tcc.git /notebooks/TCC
+cd /notebooks/TCC
+pip install -r requirements.txt
+```
+
+3. Abrir o notebook desejado em `notebooks/` pelo file browser
+4. Executar as cells sequencialmente — a deteccao de plataforma e automatica
+5. O cache e armazenado em `/storage/tcc-cache` (persistente entre instancias de notebook)
+
+**Vantagens do Paperspace Gradient:**
+- GPU A5000 com 24 GB VRAM (suficiente para todo o pipeline)
+- `/storage/` persiste entre instancias de notebook (equivalente ao Google Drive)
+- Sem restart de runtime por NumPy ABI (ambiente controlado)
+- Sem necessidade de montar Google Drive
 
 ### Execucao Local
 
@@ -223,7 +245,7 @@ Restarting runtime...
 
 **Causa:** Colab pre-carrega NumPy 2.x na memoria, mas `requirements.txt` pina 1.26.4.
 **Solucao:** O runtime reinicia automaticamente. Basta **re-executar a cell de setup**. Acontece apenas 1 vez por sessao.
-**Nota:** Este problema nao ocorre no Lightning.ai nem em execucao local.
+**Nota:** Este problema nao ocorre no Lightning.ai, Paperspace Gradient nem em execucao local.
 
 ### Google Drive nao monta (Colab apenas)
 
@@ -232,13 +254,13 @@ Drive already mounted at /content/drive
 ```
 
 Se o Drive nao montar, verificar se a conta Google tem espaco disponivel (~50 GB necessarios).
-**Nota:** No Lightning.ai, o storage e persistente e nao depende de Google Drive.
+**Nota:** No Lightning.ai e Paperspace Gradient, o storage e persistente e nao depende de Google Drive.
 
 ### CUDA Out of Memory (wav2vec2)
 
 Se o treino do wav2vec2 estourar VRAM:
 - Reduzir `batch_size` em `configs/accent_classifier.yaml` (de 8 para 4)
-- Usar GPU com mais VRAM (A100 no Colab, L4 no Lightning.ai)
+- Usar GPU com mais VRAM (A100 no Colab, L4 no Lightning.ai, A5000+ no Paperspace)
 - O `freeze_feature_extractor: true` ja esta ativo por padrao
 
 ### Download lento do CORAA-MUPE
