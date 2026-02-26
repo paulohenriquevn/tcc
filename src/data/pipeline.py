@@ -76,7 +76,7 @@ def load_or_build_accents_dataset(
         from datasets import concatenate_datasets, load_dataset
 
         print("Downloading CORAA-MUPE-ASR from HuggingFace (~42 GB first time)...")
-        ds = load_dataset("nilc-nlp/CORAA-MUPE-ASR")
+        ds = load_dataset("nilc-nlp/CORAA-MUPE-ASR", token=True)
         all_data = concatenate_datasets([ds[split] for split in ds.keys()])
         print(f"Total concatenado: {len(all_data):,} rows")
 
@@ -109,14 +109,24 @@ def load_or_build_accents_dataset(
         cv_sha = compute_file_hash(cv_manifest_path)
         print(f"Common Voice PT: {len(cv_entries):,} entries (cached, SHA: {cv_sha[:16]}...)")
     else:
-        from datasets import load_dataset
+        from datasets import concatenate_datasets, load_dataset
 
         cv_hf_id = config["dataset"]["sources"][1]["hf_id"]
         cv_lang = config["dataset"]["sources"][1]["hf_lang"]
 
         print(f"Loading Common Voice PT from HuggingFace ({cv_hf_id})...")
-        cv_dataset = load_dataset(cv_hf_id, cv_lang, split="validated")
-        print(f"Common Voice validated: {len(cv_dataset):,} rows")
+        # Load validated splits and concatenate (mirrors may not have the
+        # aggregate "validated" split — train+validation+test is equivalent).
+        _cv_splits = []
+        for _split_name in ("train", "validation", "test"):
+            _s = load_dataset(
+                cv_hf_id, cv_lang, split=_split_name,
+                token=True, trust_remote_code=True,
+            )
+            print(f"  {_split_name}: {len(_s):,} rows")
+            _cv_splits.append(_s)
+        cv_dataset = concatenate_datasets(_cv_splits)
+        print(f"Common Voice validated (concatenated): {len(cv_dataset):,} rows")
 
         from src.data.cv_manifest_builder import build_manifest_from_common_voice
 

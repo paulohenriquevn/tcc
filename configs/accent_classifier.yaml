@@ -21,7 +21,7 @@ dataset:
       hf_id: "nilc-nlp/CORAA-MUPE-ASR"
       manifest_path: null  # filled at runtime
     - name: "CommonVoice-PT"
-      hf_id: "mozilla-foundation/common_voice_17_0"
+      hf_id: "fsicoli/common_voice_17_0"  # community mirror — mozilla-foundation removed data Oct 2025
       hf_lang: "pt"
       manifest_path: null  # filled at runtime
 
