@@ -29,6 +29,33 @@ from src.evaluation.confusion import (
 logger = logging.getLogger(__name__)
 
 
+def build_probe_data(
+    feature_dict: dict[str, np.ndarray],
+    entry_list: list,
+    target_field: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build X, y arrays for probing from features dict and manifest entries.
+
+    Matches entries to their feature vectors by utt_id and extracts
+    the target field as labels. Entries without features are silently skipped.
+
+    Args:
+        feature_dict: Mapping of utt_id -> feature vector (numpy array).
+        entry_list: List of ManifestEntry objects.
+        target_field: Attribute name on ManifestEntry to use as label
+                      (e.g., 'accent', 'speaker_id').
+
+    Returns:
+        Tuple of (X, y) numpy arrays ready for sklearn.
+    """
+    X, y = [], []
+    for entry in entry_list:
+        if entry.utt_id in feature_dict:
+            X.append(feature_dict[entry.utt_id])
+            y.append(getattr(entry, target_field))
+    return np.array(X), np.array(y)
+
+
 @dataclass
 class ProbeResult:
     """Result of a single probe experiment."""

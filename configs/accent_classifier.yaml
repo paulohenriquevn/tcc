@@ -62,6 +62,7 @@ cnn:
   training:
     learning_rate: 0.001
     batch_size: 32
+    num_workers: 2
     n_epochs: 50
     patience: 10  # early stopping on val balanced accuracy
     use_amp: true
@@ -76,6 +77,7 @@ wav2vec2:
   training:
     learning_rate: 3.0e-5
     batch_size: 8  # smaller for VRAM constraint (24GB)
+    num_workers: 2
     n_epochs: 20
     patience: 5
     use_amp: true
@@ -83,6 +85,7 @@ wav2vec2:
 # --- Cross-Source Evaluation ---
 cross_source:
   enabled: true
+  above_chance_margin_pp: 5  # percentage points above chance to consider "above chance"
   # Train on source A, test on source B (and vice versa)
   # If both directions at chance -> classifier learned source, not accent
 
@@ -115,7 +118,7 @@ output:
   report_json: "experiments/accent_classifier/reports/ablation_report.json"
   figures_dir: "experiments/accent_classifier/reports/figures/"
 
-# --- Cache (Google Drive persistence across Colab sessions) ---
+# --- Cache ---
 cache:
   enabled: true
-  drive_base: "/content/drive/MyDrive/tcc-cache"
+  # drive_base is determined at runtime by src.utils.platform.detect_platform()

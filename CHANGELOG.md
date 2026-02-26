@@ -6,13 +6,56 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 
 ## [Unreleased]
 
+### Fixed
+- Notebook `stage1_5` cell 30: gate decision comparava com `'PASS'` mas `evaluate_probe_against_thresholds()` retorna `'GO'`/`'GO_CONDITIONAL'`/`'FAIL'` — gate nunca passava, decisão era sempre FAIL (#16)
+- Notebook `stage1_5` cells 23-25: estado mutável `all_probe_results` compartilhado entre células causava duplicação de resultados ao re-executar — listas agora inicializadas/filtradas no início de cada cell para idempotência (#16)
+- Notebook `stage1_5` cell 31: comprehension aninhada O(n*k) para cálculo de region stats substituída por iteração O(n) com `defaultdict` (#16)
+- Notebook `accents_pt_br_dataset` cells 13-14: publicação no HuggingFace Hub executava automaticamente em Run All — adicionado gate `PUBLISH = False` que requer ativação manual (#16)
+- Notebook `accents_pt_br_dataset` cell 14: escrita intermediária em `/tmp` (colisão em sistemas compartilhados) substituída por `tempfile.NamedTemporaryFile` (#16)
+- Notebook `accents_pt_br_classifier` cells 7, 11: referências hardcoded a números de célula (`cell-2`, `cell-15`) já incorretas — removidas (#16)
+- Notebook `accents_pt_br_classifier` cells 7, 11, 15, 17: `num_workers=2` hardcoded em 12 DataLoaders substituído por `cnn_cfg['training']['num_workers']` / `w2v_cfg['training']['num_workers']` do YAML config (#16)
+- Notebook `accents_pt_br_dataset` cell 2: `pip install huggingface_hub` redundante removido — já é dependência transitiva de `datasets==3.2.0` instalado pelo bootstrap (#16)
+- Notebook `accents_pt_br_dataset` cells 9, 12: mapeamento inline `'val' → 'validation'` substituído por `to_hf_split_entries()` de `src.data.hf_utils` — centraliza convenção de nomes (DRY) (#16)
+- Notebook `accents_pt_br_dataset` cell 16: dict inline `hf_to_internal` substituído por reversão de `INTERNAL_TO_HF_SPLITS` de `src.data.hf_utils` (#16)
+
 ### Added
+- `src/data/pipeline.py` — módulo `load_or_build_accents_dataset()` com `DatasetBundle` dataclass: pipeline unificada de dataset que elimina duplicação entre notebooks dataset e classifier (#15)
+- `src/data/hf_utils.py` — `entries_to_hf_dict()` e `build_dataset_card()` extraídos do notebook dataset para código testável (#15)
+- `src/utils/git.py` — `get_commit_hash()` centralizado, elimina `import subprocess` espalhado nos notebooks (#15)
+- `build_probe_data()` em `src/evaluation/probes.py` — extraído do notebook stage1_5 para código auditável (#15)
+- `src/utils/notebook_bootstrap.py` — módulo stdlib-only de bootstrap para notebooks: detecção de plataforma (Colab, Lightning.ai, Paperspace, local), clone de repo, pip install e verificação de NumPy ABI (#14)
+- Notebook `accents_pt_br_classifier`: seção "Robustness Check" com retreino multi-seed [42, 1337, 7] para ambos classifiers e comparação de variância (#14)
+- Notebook `stage1_5`: assertions explícitos de speaker-disjoint splits após geração de splits (#14)
 - `train_classifier()` agora aceita `resume_from: Path` para retomar treinamento de checkpoint — restaura model, optimizer, scaler e epoch (#12)
 - `label_to_idx` persistido em JSON no notebook do classificador para mapeamento reproduzível de labels (#12)
 - `tqdm==4.67.1` pinado explicitamente no `requirements.txt` — era dependência transitiva, agora versionada (#12)
 - Notebook `stage1_5`: seções "## 1. Download e Build Manifest" e "## 4. Feature Extraction", histograma de duração, e célula de gate decision com avaliação GO/ADJUST/FAIL estruturada (#12)
 - Notebook `accents_pt_br_classifier`: verificação de chance level antes da avaliação cross-source (#12)
 - Suporte a Paperspace Gradient em `src/utils/platform.py` — detecção automática via env `PAPERSPACE`, cache em `/storage/tcc-cache` (#13)
+
+### Changed
+- Notebooks dataset e classifier: pipeline duplicada (~10 cells cada) substituída por chamada única a `load_or_build_accents_dataset()` — DRY (#15)
+- Notebook classifier: `seed_worker` inline (sem `random.seed`) substituído por import de `src.utils.seed.seed_worker` (completo) (#15)
+- Notebook dataset: dataset card gerado via `build_dataset_card()` em vez de f-string inline de 200 linhas (#15)
+- Notebook dataset: `entries_to_hf_dict()` importado de `src.data.hf_utils` em vez de definição inline (#15)
+- Notebook classifier: cross-source threshold usa `config['cross_source']['above_chance_margin_pp']` em vez de hardcoded `0.05` (#15)
+- Notebook stage1_5: `NEUTRAL_TEXT` vem de `config['features']['backbone']['neutral_text']` em vez de hardcoded (#15)
+- Notebook stage1_5: VRAM monitorado após cada fase de extração de features (#15)
+- Notebook classifier: robustness check markdown inclui estimativa de tempo (~2-4h GPU) (#15)
+- Notebook classifier: report JSON inclui `robustness_results` e seções renumeradas (§3-§7) (#15)
+- Todos os notebooks: `torch.load(..., weights_only=False)` documentado com comentário explicando motivo (#15)
+- `configs/accent_classifier.yaml`: `above_chance_margin_pp: 5` adicionado à seção cross_source; comentário de `cache.drive_base` corrigido (#15)
+- `configs/stage1_5.yaml`: `neutral_text` adicionado à seção `features.backbone`; comentário de `cache.drive_base` corrigido (#15)
+- Notebooks (stage1_5, classifier, dataset): setup cells reescritos para usar `notebook_bootstrap.bootstrap()` — elimina triplicação de boilerplate de plataforma (#14)
+- Notebook `accents_pt_br_classifier`: numeração de seções atualizada (Robustness Check = §9, Cross-source = §10, Ablation = §11) (#14)
+- Notebook `accents_pt_br_dataset`: mapeamento de split names `validation→val` substituído por dict explícito `hf_to_internal` (#14)
+
+### Fixed
+- Notebook classifier: `seed_worker` inline estava sem `random.seed(worker_seed)` — causava não-determinismo em DataLoader workers que usam `random` (#15)
+- Notebook `stage1_5` cell-15: `np.mean()`/`np.std()`/`np.median()` usados antes de `import numpy as np` — adicionado import no topo da célula (#14)
+- Todos os 3 notebooks: montagem dupla de Google Drive (bootstrap + `setup_environment()`) — removida chamada redundante (#14)
+- Notebook `stage1_5`: variável `overall` usada em gate decision sem inicialização — adicionado safe default `'NOT_EVALUATED'` (#14)
+- Notebook `accents_pt_br_classifier`: variável `train_labels_cnn` nomeada incorretamente (compartilhada por CNN e wav2vec2) — renomeada para `train_labels` (#14)
 
 ### Changed
 - Checkpoint do trainer agora inclui `scaler_state_dict` e `seed` para reprodutibilidade completa de estado (#12)

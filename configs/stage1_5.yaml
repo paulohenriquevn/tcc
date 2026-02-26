@@ -68,6 +68,7 @@ features:
     model: "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
     layers: [0, 4, 8, 12, 16, 20, 24, 27]
     pooling: "mean_temporal"
+    neutral_text: "Este é um texto neutro para extração de features."
     # 28 layers total, 8 probing points covering full depth
 
 # --- Probes ---
@@ -143,10 +144,10 @@ thresholds:
     conditional: 0.15  # < 15% drop
     # FAIL if >= 15% drop
 
-# --- Cache (Google Drive persistence across Colab sessions) ---
+# --- Cache ---
 cache:
   enabled: true
-  drive_base: "/content/drive/MyDrive/tcc-cache"
+  # drive_base is determined at runtime by src.utils.platform.detect_platform()
 
 # --- Output ---
 output:
