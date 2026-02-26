@@ -63,13 +63,23 @@ def _clone_if_needed(repo_dir: str) -> None:
 
 
 def _install_deps(repo_dir: str) -> None:
-    """Install requirements.txt quietly."""
+    """Install requirements.txt quietly, surfacing errors on failure."""
     req_path = os.path.join(repo_dir, "requirements.txt")
     if os.path.exists(req_path):
-        subprocess.run(
+        result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "-r", req_path, "-q"],
-            check=True,
+            capture_output=True,
+            text=True,
         )
+        if result.returncode != 0:
+            print("pip install FAILED. stderr:")
+            print(result.stderr)
+            print("stdout:")
+            print(result.stdout)
+            raise RuntimeError(
+                f"pip install -r requirements.txt failed (exit {result.returncode}). "
+                "Check the output above for the failing package."
+            )
 
 
 def _check_numpy_abi() -> None:
