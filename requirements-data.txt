@@ -14,7 +14,7 @@ soundfile==0.13.1
 
 # Dataset download and publication (HuggingFace)
 datasets==3.3.2
-huggingface-hub==0.28.1
+huggingface-hub==0.34.6
 
 # Data and analysis
 pandas==2.2.3
