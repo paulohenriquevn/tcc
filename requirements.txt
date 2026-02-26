@@ -1,17 +1,16 @@
-# Stage 1.5 — Latent Separability Audit
+# Stage 1.5 — Latent Separability Audit (full ML stack)
 # Pin ALL versions for reproducibility. Never use >= or ~=.
-# Update date: 2026-02-24
+# Update date: 2026-02-26
 
-# Core ML
+# Lightweight data deps (shared with dataset notebook)
+-r requirements-data.txt
+
+# Core ML (Colab pre-installs torch — these pins ensure reproducibility)
 torch==2.6.0
 torchaudio==2.6.0
-numpy==1.26.4
-scipy==1.14.1
-scikit-learn==1.6.1
 
 # Audio processing
 librosa==0.10.2.post1
-soundfile==0.13.1
 pyloudnorm==0.1.1
 
 # Speaker embeddings (ECAPA-TDNN)
@@ -26,27 +25,9 @@ accelerate==1.12.0
 # Backbone (Qwen3-TTS) — requires GPU, Colab only
 qwen-tts==0.1.1
 
-# Dataset download and publication (HuggingFace)
-datasets==3.3.2
-huggingface-hub==0.28.1
-
-# Data and analysis
-pandas==2.2.3
-pyarrow==18.1.0
-
-# Visualization
-matplotlib==3.10.0
-seaborn==0.13.2
-
 # Experiment tracking (optional, for Stage 2+)
 # wandb==0.19.6
 
 # Testing
 pytest==8.3.4
 pytest-cov==6.0.0
-
-# Progress bars
-tqdm==4.67.1
-
-# Config
-pyyaml==6.0.2
