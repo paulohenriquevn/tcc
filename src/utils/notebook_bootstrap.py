@@ -1,15 +1,21 @@
-"""Notebook bootstrap — stdlib-only, no third-party imports.
+"""Notebook bootstrap helpers — stdlib-only, no third-party imports.
 
-This module bootstraps the execution environment for Jupyter notebooks.
-It handles: platform detection, repo cloning, dependency installation,
-and NumPy ABI compatibility checks.
+This module provides helper functions for the inline bootstrap code that
+runs in the first cell of every notebook. The inline code (in the notebook
+cell itself) handles git clone, sys.path setup, and pip install using only
+stdlib. After that, it imports _check_numpy_abi() from this module.
 
 IMPORTANT: This module must NOT import any third-party packages because
-it runs BEFORE pip install. Only Python stdlib is allowed.
+it may run BEFORE pip install completes. Only Python stdlib is allowed.
 
-Usage (first cell of every notebook):
-    from src.utils.notebook_bootstrap import bootstrap
-    bootstrap()
+Usage (first cell of every notebook — inline, NOT imported directly):
+    # ... inline clone/install code (see notebooks for full pattern) ...
+    from src.utils.notebook_bootstrap import _check_numpy_abi
+    _check_numpy_abi()
+
+The bootstrap() function is kept for backwards compatibility but should
+NOT be used as the primary entry point (it requires the repo to already
+exist on sys.path, which is a chicken-and-egg problem on fresh Colab).
 """
 
 import os

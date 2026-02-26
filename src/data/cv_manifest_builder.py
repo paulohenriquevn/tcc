@@ -55,7 +55,8 @@ def build_manifest_from_common_voice(
       Phase 2 — Decode and save audio only for rows that passed filters.
 
     Expected dataset columns: client_id, path, sentence, age, gender,
-    accent, audio, duration.
+    accent, audio. The 'duration' column is optional — if absent, duration
+    is computed from the decoded audio array in Phase 2.
 
     Args:
         dataset: HuggingFace Dataset (Common Voice Portuguese split).
@@ -75,8 +76,8 @@ def build_manifest_from_common_voice(
     audio_output_dir = Path(audio_output_dir)
     audio_output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Validate required columns
-    required_columns = {"client_id", "path", "gender", "accent", "audio", "duration"}
+    # Validate required columns (duration is optional — computed from audio if absent)
+    required_columns = {"client_id", "path", "gender", "accent", "audio"}
     missing = required_columns - set(dataset.column_names)
     if missing:
         raise ValueError(
@@ -84,12 +85,18 @@ def build_manifest_from_common_voice(
             f"Available: {dataset.column_names}"
         )
 
+    has_duration_column = "duration" in dataset.column_names
+
     logger.info(f"Processing Common Voice dataset: {len(dataset)} rows")
+    if not has_duration_column:
+        logger.info(
+            "No 'duration' column found — duration filter deferred to Phase 2 (audio decode)"
+        )
 
     # ── Phase 1: Fast metadata filtering (no audio decoding) ──
     logger.info("Phase 1: Filtering by metadata (no audio decode)...")
     accents = dataset["accent"]
-    durations = dataset["duration"]
+    durations = dataset["duration"] if has_duration_column else None
     genders = dataset["gender"]
     client_ids = dataset["client_id"]
 
@@ -117,15 +124,16 @@ def build_manifest_from_common_voice(
             filter_stats["rejected_unknown_accent"] += 1
             continue
 
-        # Filter: duration in range
-        dur = durations[idx]
-        if dur is None:
-            filter_stats["rejected_duration"] += 1
-            continue
-        dur = float(dur)
-        if dur < min_duration_s or dur > max_duration_s:
-            filter_stats["rejected_duration"] += 1
-            continue
+        # Filter: duration in range (skip if column absent — deferred to Phase 2)
+        if durations is not None:
+            dur = durations[idx]
+            if dur is None:
+                filter_stats["rejected_duration"] += 1
+                continue
+            dur = float(dur)
+            if dur < min_duration_s or dur > max_duration_s:
+                filter_stats["rejected_duration"] += 1
+                continue
 
         # Filter: gender maps to M/F
         raw_gender = (genders[idx] or "").strip().lower()
@@ -159,7 +167,6 @@ def build_manifest_from_common_voice(
         raw_accent = row["accent"].strip()
         accent = normalize_cv_accent(raw_accent)
         gender = _CV_GENDER_MAP[row["gender"].strip().lower()]
-        duration = float(row["duration"])
         client_id = row["client_id"].strip()
         speaker_id = f"cv_{client_id}"
 
@@ -179,6 +186,16 @@ def build_manifest_from_common_voice(
         audio_data = row["audio"]
         audio_array = np.array(audio_data["array"], dtype=np.float32)
         audio_sr = int(audio_data["sampling_rate"])
+
+        # Compute duration from audio (always accurate, handles missing column)
+        if has_duration_column:
+            duration = float(row["duration"])
+        else:
+            duration = len(audio_array) / audio_sr
+            # Deferred duration filter (Phase 1 skipped it when column was absent)
+            if duration < min_duration_s or duration > max_duration_s:
+                filter_stats["rejected_duration"] += 1
+                continue
 
         if audio_sr != TARGET_SR:
             audio_tensor = torch.from_numpy(audio_array)
