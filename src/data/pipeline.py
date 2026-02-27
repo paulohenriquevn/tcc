@@ -141,13 +141,25 @@ def load_or_build_accents_dataset(
                 "min_utterances_per_speaker", 3
             ),
         )
-        print(
-            f"Common Voice PT: {len(cv_entries):,} entries, "
-            f"SHA-256: {cv_stats['manifest_sha256']}"
-        )
+        if cv_entries:
+            print(
+                f"Common Voice PT: {len(cv_entries):,} entries, "
+                f"SHA-256: {cv_stats['manifest_sha256']}"
+            )
+        else:
+            print(
+                "Common Voice PT: 0 usable entries "
+                f"(filter stats: {cv_stats['filter_stats']})"
+            )
+            print("  Accent metadata is sparse in CV-PT. Proceeding with CORAA-MUPE only.")
 
     # --- 3. Combine manifests ---
     combined_manifest_path = drive_base / "accents_pt_br" / "manifest.jsonl"
+
+    # Only include manifests that exist and have entries
+    manifests_to_combine = [(coraa_manifest_path, "CORAA-MUPE")]
+    if cv_manifest_path.exists():
+        manifests_to_combine.append((cv_manifest_path, "CommonVoice-PT"))
 
     if combined_manifest_path.exists():
         logger.info("Loading combined manifest from cache: %s", combined_manifest_path)
@@ -156,10 +168,7 @@ def load_or_build_accents_dataset(
         print(f"Combined: {len(combined_entries):,} entries (cached, SHA: {combined_sha256[:16]}...)")
     else:
         combined_entries, combined_stats = combine_manifests(
-            manifests=[
-                (coraa_manifest_path, "CORAA-MUPE"),
-                (cv_manifest_path, "CommonVoice-PT"),
-            ],
+            manifests=manifests_to_combine,
             output_path=combined_manifest_path,
             min_speakers_per_region=config["dataset"]["filters"]["min_speakers_per_region"],
             min_utterances_per_speaker=config["dataset"]["filters"].get(

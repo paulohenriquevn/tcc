@@ -230,6 +230,20 @@ def build_manifest_from_common_voice(
 
     logger.info(f"Phase 2 complete: {len(filtered)} entries with audio saved")
 
+    # ── Early exit: no usable entries ──
+    if not filtered:
+        logger.warning(
+            "No entries passed all filters. "
+            f"Stats: {filter_stats}"
+        )
+        return [], {
+            "filter_stats": filter_stats,
+            "manifest_sha256": None,
+            "regions": {},
+            "total_speakers": 0,
+            "total_utterances": 0,
+        }
+
     # ── Post-filtering and validation ──
     filtered, region_speakers, dropped_regions = _filter_regions_by_speaker_count(
         filtered, min_speakers_per_region
