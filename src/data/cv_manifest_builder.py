@@ -45,7 +45,7 @@ def build_manifest_from_common_voice(
     manifest_output_path: Path,
     min_duration_s: float = 3.0,
     max_duration_s: float = 15.0,
-    min_speakers_per_region: int = 8,
+    min_speakers_per_region: int = 5,
     min_utterances_per_speaker: int = 0,
 ) -> tuple[list[ManifestEntry], dict]:
     """Build manifest from a HuggingFace Common Voice Portuguese dataset.

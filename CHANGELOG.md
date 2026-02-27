@@ -6,6 +6,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 
 ## [Unreleased]
 
+### Changed
+- `min_speakers_per_region` reduzido de 8 para 5 em configs, defaults de funções e protocolo — decisão data-driven baseada em census completo do CORAA-MUPE-ASR (317k rows via streaming): Sul tem 7 speakers qualificados com 3.740 utterances; Centro-Oeste excluído (3 speakers insuficientes para splits speaker-disjoint). Cobertura regional expandida de 3 para 4 macro-regiões: N, NE, SE, S (#17)
+
 ### Fixed
 - Notebook `stage1_5` cell 30: gate decision comparava com `'PASS'` mas `evaluate_probe_against_thresholds()` retorna `'GO'`/`'GO_CONDITIONAL'`/`'FAIL'` — gate nunca passava, decisão era sempre FAIL (#16)
 - Notebook `stage1_5` cells 23-25: estado mutável `all_probe_results` compartilhado entre células causava duplicação de resultados ao re-executar — listas agora inicializadas/filtradas no início de cada cell para idempotência (#16)

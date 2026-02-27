@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def combine_manifests(
     manifests: list[tuple[Path, str]],
     output_path: Path,
-    min_speakers_per_region: int = 8,
+    min_speakers_per_region: int = 5,
     min_utterances_per_speaker: int = 3,
 ) -> tuple[list[ManifestEntry], dict]:
     """Merge multiple source manifests into Accents-PT-BR.

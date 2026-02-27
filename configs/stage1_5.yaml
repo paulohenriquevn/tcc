@@ -24,11 +24,13 @@ dataset:
     speaker_type: "R"  # interviewees only
     min_duration_s: 3.0
     max_duration_s: 15.0
-    min_speakers_per_region: 8
+    min_speakers_per_region: 5
     min_utterances_per_speaker: 3
 
   accent_mapping: "birth_state_to_ibge_macro"
-  # N=Norte, NE=Nordeste, CO=Centro-Oeste, SE=Sudeste, S=Sul
+  # Data-driven decision (census 2026-02-27): 4 regions — N, NE, SE, S.
+  # CO excluded (only 3 speakers in CORAA-MUPE).
+  # Threshold reduced from 8 to 5 to include Sul (7 speakers, 3740 utterances).
 
 # --- Splits ---
 splits:

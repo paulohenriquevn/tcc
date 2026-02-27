@@ -132,7 +132,7 @@ def build_manifest_from_coraa(
     speaker_type_filter: str = "R",
     min_duration_s: float = 3.0,
     max_duration_s: float = 15.0,
-    min_speakers_per_region: int = 8,
+    min_speakers_per_region: int = 5,
     min_utterances_per_speaker: int = 0,
 ) -> tuple[list[ManifestEntry], dict]:
     """Build manifest from CORAA-MUPE metadata.
@@ -285,7 +285,7 @@ def build_manifest_from_hf_dataset(
     speaker_type_filter: str = "R",
     min_duration_s: float = 3.0,
     max_duration_s: float = 15.0,
-    min_speakers_per_region: int = 8,
+    min_speakers_per_region: int = 5,
     min_utterances_per_speaker: int = 0,
 ) -> tuple[list[ManifestEntry], dict]:
     """Build manifest from a HuggingFace CORAA-MUPE dataset object.

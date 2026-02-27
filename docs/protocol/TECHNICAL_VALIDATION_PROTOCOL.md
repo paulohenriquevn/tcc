@@ -63,7 +63,14 @@ Audio = TTS(texto, S, A)
 ### 4.3 Rótulo de sotaque
 - Usar **macro-regiões IBGE**: N (Norte), NE (Nordeste), CO (Centro-Oeste), SE (Sudeste), S (Sul);
 - `birth_state` é tratado como **proxy**, não ground truth;
-- Stage 1.5 usa 5 macro-regiões para maximizar cobertura do espaço dialectal. Se distribuição de speakers for insuficiente em alguma região (< 8 speakers), colapsar para 3 macro-regiões (NE, SE, S) como fallback;
+- **Decisão data-driven (census 2026-02-27):** census completo do CORAA-MUPE-ASR (317.743 rows, streaming) revelou distribuição real de speakers por macro-região após filtros (speaker_type=R, duração 3-15s, gênero válido, birth_state válido):
+  - N: 30 speakers (12.942 utt) — **PASS**
+  - NE: 39 speakers (19.333 utt) — **PASS**
+  - CO: 3 speakers (1.406 utt) — **EXCLUÍDO** (insuficiente para splits speaker-disjoint)
+  - SE: 193 speakers (104.652 utt) — **PASS**
+  - S: 7 speakers (3.740 utt) — **PASS** (threshold reduzido de 8 para 5)
+- **Configuração adotada:** 4 macro-regiões (N, NE, SE, S) com `min_speakers_per_region=5`;
+- CO documentado como limitação do CORAA-MUPE (apenas 3 speakers de GO/MS/MT no corpus);
 - Decisão de manter ou reduzir classes é tomada após análise de distribuição no manifest, não a priori.
 
 ---

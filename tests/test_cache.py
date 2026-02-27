@@ -35,7 +35,7 @@ def _make_config(**filter_overrides):
         "speaker_type": "R",
         "min_duration_s": 3.0,
         "max_duration_s": 15.0,
-        "min_speakers_per_region": 8,
+        "min_speakers_per_region": 5,
         "min_utterances_per_speaker": 3,
     }
     filters.update(filter_overrides)
