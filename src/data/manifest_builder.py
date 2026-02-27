@@ -414,19 +414,20 @@ def build_manifest_from_hf_dataset(
             utt_id = f"{utt_id}_{pass_indices[i]:06d}"
         seen_utt_ids.add(utt_id)
 
-        # Save audio to WAV
+        # Save audio to WAV (skip if already exists from a previous build)
         audio_sr = int(audio_data["sampling_rate"])
         wav_path = audio_output_dir / f"{utt_id}.wav"
-        try:
-            sf.write(
-                str(wav_path),
-                audio_data["array"],
-                audio_sr,
-            )
-        except Exception as e:
-            filter_stats["rejected_audio_error"] += 1
-            logger.warning(f"Failed to save audio for {utt_id}: {e}")
-            continue
+        if not wav_path.exists():
+            try:
+                sf.write(
+                    str(wav_path),
+                    audio_data["array"],
+                    audio_sr,
+                )
+            except Exception as e:
+                filter_stats["rejected_audio_error"] += 1
+                logger.warning(f"Failed to save audio for {utt_id}: {e}")
+                continue
 
         entry = ManifestEntry(
             utt_id=utt_id,

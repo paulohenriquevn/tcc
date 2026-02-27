@@ -14,6 +14,11 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 - `min_speakers_per_region` reduzido de 8 para 5 em configs, defaults de funções e protocolo — decisão data-driven baseada em census completo do CORAA-MUPE-ASR (317k rows via streaming): Sul tem 7 speakers qualificados com 3.740 utterances (#17)
 
 ### Fixed
+- `pipeline.py` reescrito: filtro de região era aplicado per-source (cada builder independentemente descartava CO por ter < 5 speakers), impedindo a agregação multi-source (CORAA-CO 3 + CV-CO 4 = 7) — agora builders recebem `min_speakers_per_region=0` e o threshold real é aplicado APENAS no `combine_manifests()` (#19)
+- `pipeline.py`: cache usava bare `file.exists()` sem validação de hash — config de filtros podia mudar e o pipeline continuava servindo manifests stale. Agora usa sidecars `.filter_hash` com `compute_filter_hash()` de `src.data.cache`; cache combinado inclui SHAs dos manifests-fonte (#19)
+- `manifest_builder.py` e `cv_manifest_builder.py`: audio WAV era reescrito incondicionalmente em rebuilds de manifest, decodificando do HuggingFace e salvando mesmo quando o arquivo já existia — adicionado guard `if not wav_path.exists()` para skip-existing-audio (#19)
+
+### Fixed
 - Notebook `stage1_5` cell 30: gate decision comparava com `'PASS'` mas `evaluate_probe_against_thresholds()` retorna `'GO'`/`'GO_CONDITIONAL'`/`'FAIL'` — gate nunca passava, decisão era sempre FAIL (#16)
 - Notebook `stage1_5` cells 23-25: estado mutável `all_probe_results` compartilhado entre células causava duplicação de resultados ao re-executar — listas agora inicializadas/filtradas no início de cada cell para idempotência (#16)
 - Notebook `stage1_5` cell 31: comprehension aninhada O(n*k) para cálculo de region stats substituída por iteração O(n) com `defaultdict` (#16)

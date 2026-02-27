@@ -7,6 +7,11 @@ notebooks to avoid code duplication (DRY).
 This module is the single entry point for the full data pipeline.
 Individual steps remain in their respective modules (manifest_builder,
 cv_manifest_builder, combined_manifest, splits, confounds).
+
+Architecture note: per-source builders receive min_speakers_per_region=0
+so they keep ALL regions. The region threshold is applied ONLY at the
+combine step, where speakers from multiple sources are aggregated.
+This enables the multi-source strategy (e.g. CORAA-CO 3 + CV-CO 4 = 7).
 """
 
 import logging
@@ -14,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.analysis.confounds import ConfoundResult, run_all_confound_checks
+from src.data.cache import compute_filter_hash
 from src.data.combined_manifest import analyze_source_distribution, combine_manifests
 from src.data.manifest import ManifestEntry, compute_file_hash, read_manifest
 from src.data.splits import (
@@ -42,6 +48,23 @@ class DatasetBundle:
     source_distribution: dict
 
 
+def _is_cache_valid(
+    manifest_path: Path, hash_path: Path, expected_hash: str,
+) -> bool:
+    """Check if cached manifest is valid (exists and filter hash matches)."""
+    if not manifest_path.exists():
+        return False
+    if not hash_path.exists():
+        return False
+    return hash_path.read_text().strip() == expected_hash
+
+
+def _write_cache_hash(hash_path: Path, hash_value: str) -> None:
+    """Write filter hash sidecar for cache validation."""
+    hash_path.parent.mkdir(parents=True, exist_ok=True)
+    hash_path.write_text(hash_value + "\n")
+
+
 def load_or_build_accents_dataset(
     config: dict,
     drive_base: Path,
@@ -51,6 +74,14 @@ def load_or_build_accents_dataset(
     Handles the full pipeline: CORAA-MUPE + Common Voice manifest
     loading/building, combining, confound analysis, and speaker-disjoint
     splits. All intermediate results are cached on drive_base.
+
+    Cache invalidation uses filter-hash sidecars: when any filter config
+    changes, the hash changes and stale manifests are rebuilt. Audio files
+    on disk are reused (not re-downloaded) — only manifests are regenerated.
+
+    Region filtering (min_speakers_per_region) is applied ONLY at the
+    combine step, not per-source. This allows multi-source speaker
+    aggregation (e.g. CORAA-CO 3 speakers + CV-CO 4 speakers = 7 combined).
 
     Args:
         config: Loaded accent_classifier.yaml config dict.
@@ -63,16 +94,30 @@ def load_or_build_accents_dataset(
         AssertionError: If speaker-disjoint constraint is violated.
         ValueError: If manifest validation fails.
     """
-    # --- 1. Load or build CORAA-MUPE manifest ---
-    coraa_manifest_path = drive_base / "coraa_mupe" / "manifest.jsonl"
-    coraa_audio_dir = drive_base / "coraa_mupe" / "audio"
+    filter_hash = compute_filter_hash(config["dataset"])
+    min_spk_region = config["dataset"]["filters"]["min_speakers_per_region"]
+    min_utt_spk = config["dataset"]["filters"].get("min_utterances_per_speaker", 3)
 
-    if coraa_manifest_path.exists():
+    print(f"Filter hash: {filter_hash}")
+
+    # --- 1. Load or build CORAA-MUPE manifest ---
+    coraa_dir = drive_base / "coraa_mupe"
+    coraa_manifest_path = coraa_dir / "manifest.jsonl"
+    coraa_audio_dir = coraa_dir / "audio"
+    coraa_hash_path = coraa_dir / ".filter_hash"
+
+    if _is_cache_valid(coraa_manifest_path, coraa_hash_path, filter_hash):
         logger.info("Loading CORAA-MUPE from cache: %s", coraa_manifest_path)
         coraa_entries = read_manifest(coraa_manifest_path)
         coraa_sha = compute_file_hash(coraa_manifest_path)
         print(f"CORAA-MUPE: {len(coraa_entries):,} entries (cached, SHA: {coraa_sha[:16]}...)")
     else:
+        if coraa_manifest_path.exists():
+            logger.info(
+                "CORAA-MUPE manifest cache stale (filter hash mismatch). "
+                "Rebuilding manifest (audio files on disk are reused)..."
+            )
+
         from datasets import concatenate_datasets, load_dataset
 
         print("Downloading CORAA-MUPE-ASR from HuggingFace (~42 GB first time)...")
@@ -89,34 +134,40 @@ def load_or_build_accents_dataset(
             speaker_type_filter=config["dataset"]["filters"].get("speaker_type", "R"),
             min_duration_s=config["dataset"]["filters"]["min_duration_s"],
             max_duration_s=config["dataset"]["filters"]["max_duration_s"],
-            min_speakers_per_region=config["dataset"]["filters"]["min_speakers_per_region"],
-            min_utterances_per_speaker=config["dataset"]["filters"].get(
-                "min_utterances_per_speaker", 3
-            ),
+            min_speakers_per_region=0,  # Deferred to combine step
+            min_utterances_per_speaker=min_utt_spk,
         )
+        _write_cache_hash(coraa_hash_path, filter_hash)
+        coraa_sha = coraa_stats["manifest_sha256"]
         print(
             f"CORAA-MUPE: {len(coraa_entries):,} entries, "
-            f"SHA-256: {coraa_stats['manifest_sha256']}"
+            f"SHA-256: {coraa_sha}"
         )
 
     # --- 2. Load or build Common Voice manifest ---
-    cv_manifest_path = drive_base / "common_voice_pt" / "manifest.jsonl"
-    cv_audio_dir = drive_base / "common_voice_pt" / "audio"
+    cv_dir = drive_base / "common_voice_pt"
+    cv_manifest_path = cv_dir / "manifest.jsonl"
+    cv_audio_dir = cv_dir / "audio"
+    cv_hash_path = cv_dir / ".filter_hash"
 
-    if cv_manifest_path.exists():
+    if _is_cache_valid(cv_manifest_path, cv_hash_path, filter_hash):
         logger.info("Loading Common Voice PT from cache: %s", cv_manifest_path)
         cv_entries = read_manifest(cv_manifest_path)
         cv_sha = compute_file_hash(cv_manifest_path)
         print(f"Common Voice PT: {len(cv_entries):,} entries (cached, SHA: {cv_sha[:16]}...)")
     else:
+        if cv_manifest_path.exists():
+            logger.info(
+                "CV manifest cache stale (filter hash mismatch). "
+                "Rebuilding manifest (audio files on disk are reused)..."
+            )
+
         from datasets import concatenate_datasets, load_dataset
 
         cv_hf_id = config["dataset"]["sources"][1]["hf_id"]
         cv_lang = config["dataset"]["sources"][1]["hf_lang"]
 
         print(f"Loading Common Voice PT from HuggingFace ({cv_hf_id})...")
-        # Load validated splits and concatenate (mirrors may not have the
-        # aggregate "validated" split — train+validation+test is equivalent).
         _cv_splits = []
         for _split_name in ("train", "validation", "test"):
             _s = load_dataset(
@@ -136,15 +187,15 @@ def load_or_build_accents_dataset(
             manifest_output_path=cv_manifest_path,
             min_duration_s=config["dataset"]["filters"]["min_duration_s"],
             max_duration_s=config["dataset"]["filters"]["max_duration_s"],
-            min_speakers_per_region=config["dataset"]["filters"]["min_speakers_per_region"],
-            min_utterances_per_speaker=config["dataset"]["filters"].get(
-                "min_utterances_per_speaker", 3
-            ),
+            min_speakers_per_region=0,  # Deferred to combine step
+            min_utterances_per_speaker=min_utt_spk,
         )
+        _write_cache_hash(cv_hash_path, filter_hash)
         if cv_entries:
+            cv_sha = cv_stats["manifest_sha256"]
             print(
                 f"Common Voice PT: {len(cv_entries):,} entries, "
-                f"SHA-256: {cv_stats['manifest_sha256']}"
+                f"SHA-256: {cv_sha}"
             )
         else:
             print(
@@ -154,28 +205,37 @@ def load_or_build_accents_dataset(
             print("  Accent metadata is sparse in CV-PT. Proceeding with CORAA-MUPE only.")
 
     # --- 3. Combine manifests ---
-    combined_manifest_path = drive_base / "accents_pt_br" / "manifest.jsonl"
+    combined_dir = drive_base / "accents_pt_br"
+    combined_manifest_path = combined_dir / "manifest.jsonl"
+    combined_hash_path = combined_dir / ".filter_hash"
 
-    # Only include manifests that exist and have entries
+    # Combined cache key depends on source SHAs + filter hash.
+    # Any source manifest change or filter config change invalidates it.
+    coraa_sha = compute_file_hash(coraa_manifest_path)
+    cv_sha = compute_file_hash(cv_manifest_path) if cv_manifest_path.exists() else "none"
+    combined_cache_key = f"{filter_hash}_{coraa_sha[:12]}_{cv_sha[:12]}"
+
     manifests_to_combine = [(coraa_manifest_path, "CORAA-MUPE")]
     if cv_manifest_path.exists():
         manifests_to_combine.append((cv_manifest_path, "CommonVoice-PT"))
 
-    if combined_manifest_path.exists():
+    if _is_cache_valid(combined_manifest_path, combined_hash_path, combined_cache_key):
         logger.info("Loading combined manifest from cache: %s", combined_manifest_path)
         combined_entries = read_manifest(combined_manifest_path)
         combined_sha256 = compute_file_hash(combined_manifest_path)
         print(f"Combined: {len(combined_entries):,} entries (cached, SHA: {combined_sha256[:16]}...)")
     else:
+        if combined_manifest_path.exists():
+            logger.info("Combined manifest cache stale. Rebuilding...")
+
         combined_entries, combined_stats = combine_manifests(
             manifests=manifests_to_combine,
             output_path=combined_manifest_path,
-            min_speakers_per_region=config["dataset"]["filters"]["min_speakers_per_region"],
-            min_utterances_per_speaker=config["dataset"]["filters"].get(
-                "min_utterances_per_speaker", 3
-            ),
+            min_speakers_per_region=min_spk_region,  # Real threshold applied HERE
+            min_utterances_per_speaker=min_utt_spk,
         )
         combined_sha256 = combined_stats["manifest_sha256"]
+        _write_cache_hash(combined_hash_path, combined_cache_key)
         print(f"Combined: {len(combined_entries):,} entries, SHA-256: {combined_sha256}")
 
     # --- 4. Source distribution analysis ---

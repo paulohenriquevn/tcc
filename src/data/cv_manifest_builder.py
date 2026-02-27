@@ -206,12 +206,13 @@ def build_manifest_from_common_voice(
             audio_array = audio_tensor.numpy()
 
         wav_path = audio_output_dir / f"{utt_id}.wav"
-        try:
-            sf.write(str(wav_path), audio_array, TARGET_SR)
-        except Exception as e:
-            filter_stats["rejected_audio_error"] += 1
-            logger.warning(f"Failed to save audio for {utt_id}: {e}")
-            continue
+        if not wav_path.exists():
+            try:
+                sf.write(str(wav_path), audio_array, TARGET_SR)
+            except Exception as e:
+                filter_stats["rejected_audio_error"] += 1
+                logger.warning(f"Failed to save audio for {utt_id}: {e}")
+                continue
 
         entry = ManifestEntry(
             utt_id=utt_id,
