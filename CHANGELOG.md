@@ -6,8 +6,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 
 ## [Unreleased]
 
+### Added
+- `_CV_GENDER_MAP` expandido para aceitar labels `male_masculine`/`female_feminine` do mirror `fsicoli/common_voice_17_0` — sem isso, 100% dos rows do Common Voice PT seriam rejeitados silenciosamente pelo filtro de gênero (#18)
+
 ### Changed
-- `min_speakers_per_region` reduzido de 8 para 5 em configs, defaults de funções e protocolo — decisão data-driven baseada em census completo do CORAA-MUPE-ASR (317k rows via streaming): Sul tem 7 speakers qualificados com 3.740 utterances; Centro-Oeste excluído (3 speakers insuficientes para splits speaker-disjoint). Cobertura regional expandida de 3 para 4 macro-regiões: N, NE, SE, S (#17)
+- Estratégia de cobertura regional expandida de 4 para 5 macro-regiões (N, NE, CO, SE, S) via combinação multi-source CORAA-MUPE + Common Voice PT — CO viabilizado com 7 speakers combinados (3 CORAA + 4 CV); protocolo, configs e documentação atualizados com censos de ambas as fontes e caveats de CO (#18)
+- `min_speakers_per_region` reduzido de 8 para 5 em configs, defaults de funções e protocolo — decisão data-driven baseada em census completo do CORAA-MUPE-ASR (317k rows via streaming): Sul tem 7 speakers qualificados com 3.740 utterances (#17)
 
 ### Fixed
 - Notebook `stage1_5` cell 30: gate decision comparava com `'PASS'` mas `evaluate_probe_against_thresholds()` retorna `'GO'`/`'GO_CONDITIONAL'`/`'FAIL'` — gate nunca passava, decisão era sempre FAIL (#16)

@@ -36,6 +36,9 @@ TARGET_SR = 16_000
 _CV_GENDER_MAP: dict[str, str] = {
     "male": "M",
     "female": "F",
+    # Community mirrors (e.g. fsicoli/common_voice_17_0) use extended labels
+    "male_masculine": "M",
+    "female_feminine": "F",
 }
 
 

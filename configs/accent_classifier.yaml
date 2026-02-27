@@ -36,9 +36,11 @@ dataset:
     min_utterances_per_speaker: 3
 
   accent_mapping: "ibge_macro_region"
-  # Data-driven decision (census 2026-02-27): 4 regions — N, NE, SE, S.
-  # CO excluded (only 3 speakers in CORAA-MUPE).
-  # Threshold reduced from 8 to 5 to include Sul (7 speakers, 3740 utterances).
+  # Data-driven decision (census 2026-02-27): 5 regions — N, NE, CO, SE, S.
+  # Multi-source strategy: CORAA-MUPE + Common Voice PT.
+  # CO included via combination (3 CORAA + 4 CV = 7 speakers).
+  # CV contributes to ALL regions, diluting accent×source confound.
+  # Threshold: min_speakers_per_region=5.
 
 # --- Splits ---
 splits:

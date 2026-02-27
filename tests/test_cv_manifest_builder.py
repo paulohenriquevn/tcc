@@ -14,6 +14,7 @@ from src.data.manifest import (
     write_manifest,
 )
 from src.data.combined_manifest import combine_manifests, analyze_source_distribution
+from src.data.cv_manifest_builder import _CV_GENDER_MAP
 
 
 def _make_entry(**overrides) -> ManifestEntry:
@@ -82,6 +83,28 @@ class TestNormalizeCvAccent:
             assert region in valid_regions, (
                 f"Mapping '{key}' -> '{region}' is not a valid macro-region"
             )
+
+
+# ---------------------------------------------------------------------------
+# _CV_GENDER_MAP
+# ---------------------------------------------------------------------------
+
+
+class TestCvGenderMap:
+    def test_standard_labels(self):
+        """Standard Mozilla CV gender labels map correctly."""
+        assert _CV_GENDER_MAP["male"] == "M"
+        assert _CV_GENDER_MAP["female"] == "F"
+
+    def test_extended_labels(self):
+        """Community mirror labels (male_masculine/female_feminine) map correctly."""
+        assert _CV_GENDER_MAP["male_masculine"] == "M"
+        assert _CV_GENDER_MAP["female_feminine"] == "F"
+
+    def test_all_values_valid(self):
+        """All gender map values are M or F."""
+        for key, val in _CV_GENDER_MAP.items():
+            assert val in ("M", "F"), f"Invalid gender mapping: '{key}' -> '{val}'"
 
 
 # ---------------------------------------------------------------------------

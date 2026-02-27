@@ -63,15 +63,30 @@ Audio = TTS(texto, S, A)
 ### 4.3 Rótulo de sotaque
 - Usar **macro-regiões IBGE**: N (Norte), NE (Nordeste), CO (Centro-Oeste), SE (Sudeste), S (Sul);
 - `birth_state` é tratado como **proxy**, não ground truth;
-- **Decisão data-driven (census 2026-02-27):** census completo do CORAA-MUPE-ASR (317.743 rows, streaming) revelou distribuição real de speakers por macro-região após filtros (speaker_type=R, duração 3-15s, gênero válido, birth_state válido):
-  - N: 30 speakers (12.942 utt) — **PASS**
-  - NE: 39 speakers (19.333 utt) — **PASS**
-  - CO: 3 speakers (1.406 utt) — **EXCLUÍDO** (insuficiente para splits speaker-disjoint)
-  - SE: 193 speakers (104.652 utt) — **PASS**
-  - S: 7 speakers (3.740 utt) — **PASS** (threshold reduzido de 8 para 5)
-- **Configuração adotada:** 4 macro-regiões (N, NE, SE, S) com `min_speakers_per_region=5`;
-- CO documentado como limitação do CORAA-MUPE (apenas 3 speakers de GO/MS/MT no corpus);
-- Decisão de manter ou reduzir classes é tomada após análise de distribuição no manifest, não a priori.
+- **Decisão data-driven (census 2026-02-27):** censos completos de ambas as fontes (streaming, sem download):
+  - **CORAA-MUPE-ASR** (317.743 rows; filtros: speaker_type=R, duração 3-15s, gênero válido, birth_state válido):
+    - N: 30 speakers / 12.942 utt — **PASS**
+    - NE: 39 speakers / 19.333 utt — **PASS**
+    - CO: 3 speakers / 1.406 utt — **insuficiente isolado**
+    - SE: 193 speakers / 104.652 utt — **PASS**
+    - S: 7 speakers / 3.740 utt — **PASS**
+  - **Common Voice PT** (fsicoli/common_voice_17_0, 162.111 rows; filtros: accent mapeável, gênero válido):
+    - N: 3 speakers / 121 utt
+    - NE: 20 speakers / 592 utt
+    - CO: 4 speakers / 18.247 utt
+    - SE: 48 speakers / 7.396 utt
+    - S: 16 speakers / 14.020 utt
+  - **Combinado (CORAA-MUPE + Common Voice):**
+    - N: ~33 speakers — **PASS**
+    - NE: ~59 speakers — **PASS**
+    - CO: ~7 speakers — **PASS** (marginal, CI mais largo esperado)
+    - SE: ~241 speakers — **PASS**
+    - S: ~23 speakers — **PASS**
+- **Estratégia multi-source:** Common Voice contribui speakers para todas as 5 regiões, não apenas CO. Isso dilui a correlação accent×source — o classificador não pode aprender "qual dataset" em vez de "qual sotaque". Cross-source evaluation obrigatória (§ confounds);
+- **Configuração adotada:** 5 macro-regiões (N, NE, CO, SE, S) com `min_speakers_per_region=5`;
+- **Caveats CO:** menor número de speakers (7 combinados), gender imbalance severo (~99% M no CV), CI mais largo que outras regiões. Documentado como região com menor robustez estatística;
+- Confound accent×source monitorado via chi-quadrado + Cramer's V (threshold blocker: V ≥ 0.3);
+- Decisão de manter ou reduzir classes é tomada após análise de distribuição no manifest combinado.
 
 ---
 
