@@ -50,6 +50,7 @@ def build_manifest_from_common_voice(
     max_duration_s: float = 15.0,
     min_speakers_per_region: int = 5,
     min_utterances_per_speaker: int = 0,
+    exclude_accents: list[str] | None = None,
 ) -> tuple[list[ManifestEntry], dict]:
     """Build manifest from a HuggingFace Common Voice Portuguese dataset.
 
@@ -69,6 +70,8 @@ def build_manifest_from_common_voice(
         max_duration_s: Maximum utterance duration in seconds.
         min_speakers_per_region: Minimum speakers per macro-region.
         min_utterances_per_speaker: Minimum utterances per speaker to keep.
+        exclude_accents: IBGE macro-region codes to exclude (e.g. ["CO"]).
+            Entries whose accent normalizes to an excluded region are dropped.
 
     Returns:
         Tuple of (entries, stats_dict).
@@ -103,10 +106,13 @@ def build_manifest_from_common_voice(
     genders = dataset["gender"]
     client_ids = dataset["client_id"]
 
+    excluded_accent_set = set(exclude_accents) if exclude_accents else set()
+
     filter_stats = {
         "total_raw": len(dataset),
         "rejected_missing_accent": 0,
         "rejected_unknown_accent": 0,
+        "rejected_excluded_accent": 0,
         "rejected_duration": 0,
         "rejected_missing_gender": 0,
         "rejected_missing_client_id": 0,
@@ -123,8 +129,14 @@ def build_manifest_from_common_voice(
             continue
 
         # Filter: accent normalizes to a valid macro-region
-        if normalize_cv_accent(raw_accent) is None:
+        normalized_accent = normalize_cv_accent(raw_accent)
+        if normalized_accent is None:
             filter_stats["rejected_unknown_accent"] += 1
+            continue
+
+        # Filter: excluded accents (e.g. CO to avoid source confound)
+        if normalized_accent in excluded_accent_set:
+            filter_stats["rejected_excluded_accent"] += 1
             continue
 
         # Filter: duration in range (skip if column absent — deferred to Phase 2)

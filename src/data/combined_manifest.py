@@ -27,17 +27,21 @@ def combine_manifests(
     output_path: Path,
     min_speakers_per_region: int = 5,
     min_utterances_per_speaker: int = 3,
+    exclude_regions: list[str] | None = None,
 ) -> tuple[list[ManifestEntry], dict]:
     """Merge multiple source manifests into Accents-PT-BR.
 
     Reads each manifest JSONL, combines, validates no ID collisions,
-    applies region and speaker filters, writes combined manifest with SHA-256.
+    applies region exclusion, region and speaker filters, writes combined
+    manifest with SHA-256.
 
     Args:
         manifests: List of (manifest_path, source_name) tuples.
         output_path: Where to write the combined manifest JSONL.
         min_speakers_per_region: Minimum speakers per IBGE region.
         min_utterances_per_speaker: Minimum utterances per speaker.
+        exclude_regions: IBGE macro-regions to exclude (e.g. ["CO"]).
+            Applied before region/speaker filters.
 
     Returns:
         Tuple of (combined_entries, stats_dict).
@@ -98,6 +102,15 @@ def combine_manifests(
             f"Speakers with multiple accents: "
             f"{dict(list(inconsistent.items())[:10])} "
             f"({len(inconsistent)} total)"
+        )
+
+    # Exclude specified regions (applied BEFORE speaker/region filters)
+    if exclude_regions:
+        before = len(all_entries)
+        excluded_set = set(exclude_regions)
+        all_entries = [e for e in all_entries if e.accent not in excluded_set]
+        logger.info(
+            f"Excluded regions {exclude_regions}: {before} -> {len(all_entries)} entries"
         )
 
     # Apply region filter

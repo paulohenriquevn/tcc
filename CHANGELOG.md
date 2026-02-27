@@ -7,9 +7,22 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 ## [Unreleased]
 
 ### Added
+- `braccent_manifest_builder.py`: novo builder para o dataset Fake BrAccent — extrai REAL WAVs do archive.zip, parseia metadata dos filenames, mapeia para macro-regiões IBGE via rótulo de pasta (sotaque percebido) com re-mapeamento de DF/GO para CO via birth_state (#21)
+- Parâmetro `exclude_accents` em `build_manifest_from_common_voice()` — permite excluir regiões IBGE específicas de uma fonte (usado para remover CO do Common Voice, eliminando confound accent×source) (#21)
+- BrAccent como 3ª fonte no pipeline (`pipeline.py` Step 2.5) com cache independente, integração ao combined manifest e invalidação de cache (#21)
+- 19 testes para BrAccent builder: parsing de filename, mapeamentos, CO re-mapping, integração com zip sintético (#21)
+
+### Changed
+- Notebook `accents_pt_br_dataset`: documentação atualizada para 3 fontes (CORAA-MUPE + Common Voice + BrAccent), token HF movido para Colab Secrets (era hardcoded), cells redundantes de auth check removidas (3→1), "quick load test" do CV substituído por verificação de pré-requisitos do BrAccent (#22)
+- `hf_utils.py`: dataset card atualizado para 3 fontes — tabela de sources, distribuição, prefixos de IDs (`bra_`), estratégia CO, limitações e citações incluem BrAccent (#22)
+
+### Added
+- Parâmetro `exclude_regions` em `combine_manifests()` e config YAML — permite excluir macro-regiões IBGE do pipeline com invalidação automática de cache (#20)
 - `_CV_GENDER_MAP` expandido para aceitar labels `male_masculine`/`female_feminine` do mirror `fsicoli/common_voice_17_0` — sem isso, 100% dos rows do Common Voice PT seriam rejeitados silenciosamente pelo filtro de gênero (#18)
 
 ### Changed
+- Estratégia "5 regiões com 3 fontes": CO re-incluído no pipeline via exclusão de CO do Common Voice + adição de BrAccent como 3ª fonte — CO agora tem 5 speakers (3 CORAA-MUPE + 2 BrAccent DF/GO), V(accent×source) estimado cai de 0.8791 para ~0.14 (abaixo do threshold 0.3); CO tratado como análise secundária (não Gate-eligible, CI reportado separadamente) (#21)
+- Estratégia "4+1": CO excluído do pipeline principal por confound accent×source Cramer's V=0.8791 (threshold: 0.3) — 4 regiões restantes (N, NE, SE, S) são 96-100% CORAA-MUPE, eliminando confound; CO mantido como análise exploratória opcional (#20)
 - Estratégia de cobertura regional expandida de 4 para 5 macro-regiões (N, NE, CO, SE, S) via combinação multi-source CORAA-MUPE + Common Voice PT — CO viabilizado com 7 speakers combinados (3 CORAA + 4 CV); protocolo, configs e documentação atualizados com censos de ambas as fontes e caveats de CO (#18)
 - `min_speakers_per_region` reduzido de 8 para 5 em configs, defaults de funções e protocolo — decisão data-driven baseada em census completo do CORAA-MUPE-ASR (317k rows via streaming): Sul tem 7 speakers qualificados com 3.740 utterances (#17)
 

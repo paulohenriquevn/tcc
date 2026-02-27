@@ -24,6 +24,12 @@ dataset:
       hf_id: "fsicoli/common_voice_17_0"  # community mirror — mozilla-foundation removed data Oct 2025
       hf_lang: "pt"
       manifest_path: null  # filled at runtime
+      exclude_accents: ["CO"]  # Exclude CO from CV to resolve source confound (#21)
+    - name: "BrAccent"
+      zip_path: "dataset/archive.zip"
+      real_only: true
+      include_co_remapping: true  # DF/GO speakers re-mapped from "Sulista" to CO
+      manifest_path: null  # filled at runtime
 
   combined_manifest_path: null  # filled at runtime
   combined_manifest_sha256: null  # filled at runtime
@@ -34,13 +40,16 @@ dataset:
     max_duration_s: 15.0
     min_speakers_per_region: 5
     min_utterances_per_speaker: 3
+    exclude_regions: []  # CO re-included via 3-source strategy (#21)
 
   accent_mapping: "ibge_macro_region"
-  # Data-driven decision (census 2026-02-27): 5 regions — N, NE, CO, SE, S.
-  # Multi-source strategy: CORAA-MUPE + Common Voice PT.
-  # CO included via combination (3 CORAA + 4 CV = 7 speakers).
-  # CV contributes to ALL regions, diluting accent×source confound.
-  # Threshold: min_speakers_per_region=5.
+  # Strategy "5 regions with 3 sources" (decision 2026-02-27):
+  # CO previously excluded (V=0.8791) because 90% came from CommonVoice.
+  # Solution: exclude CO from CommonVoice + add BrAccent as 3rd source.
+  # CO now has 5 speakers: 3 CORAA-MUPE + 2 BrAccent (DF, GO re-mapped).
+  # Estimated V(accent×source) drops to ~0.14 (below 0.3 threshold).
+  # CO treated as secondary analysis: not Gate-eligible, CI reported separately.
+  # BrAccent contributes speakers to all 5 regions (NE, SE, S + 2 CO).
 
 # --- Splits ---
 splits:
