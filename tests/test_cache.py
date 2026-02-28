@@ -112,6 +112,23 @@ class TestPipelineCacheManifest:
             assert len(loaded) == 2
             assert loaded[0].utt_id == "u1"
 
+    def test_save_manifest_creates_file_and_sidecar(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache = PipelineCache(_make_config(), drive_base=tmpdir)
+            entries = [
+                _make_entry(utt_id="u1"),
+                _make_entry(utt_id="u2", speaker_id="s2", accent="NE", birth_state="BA"),
+            ]
+            sha256 = cache.save_manifest(entries)
+
+            assert cache.has_manifest() is True
+            assert len(sha256) == 64  # SHA-256 hex digest length
+
+            loaded = cache.load_manifest()
+            assert len(loaded) == 2
+            assert loaded[0].utt_id == "u1"
+            assert loaded[1].utt_id == "u2"
+
     def test_has_manifest_false_on_corrupted_hash(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = PipelineCache(_make_config(), drive_base=tmpdir)

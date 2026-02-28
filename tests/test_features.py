@@ -447,6 +447,51 @@ class TestComputeSpeakerSimilarityBaseline:
         for val in result["inter"]["values"]:
             assert -1.0 <= val <= 1.0
 
+    def test_intra_sampling_caps_pairs(self):
+        """When a speaker has more pairs than max_intra_pairs_per_speaker,
+        the number of intra pairs is capped at the limit."""
+        rng = np.random.RandomState(42)
+        n_utts = 50  # C(50,2) = 1225 possible pairs
+        cap = 100
+        speaker_embs = {
+            "spk_1": [rng.randn(192) for _ in range(n_utts)],
+            "spk_2": [rng.randn(192) for _ in range(3)],  # C(3,2)=3, below cap
+        }
+
+        result = compute_speaker_similarity_baseline(
+            speaker_embs, max_intra_pairs_per_speaker=cap,
+        )
+        # spk_1: capped at 100, spk_2: exhaustive 3 → total 103
+        assert result["intra"]["n_pairs"] == cap + 3
+
+    def test_intra_sampling_deterministic(self):
+        """Sampled intra pairs are deterministic with same seed."""
+        rng = np.random.RandomState(42)
+        speaker_embs = {
+            "spk_1": [rng.randn(192) for _ in range(50)],
+        }
+
+        r1 = compute_speaker_similarity_baseline(
+            speaker_embs, seed=42, max_intra_pairs_per_speaker=20,
+        )
+        r2 = compute_speaker_similarity_baseline(
+            speaker_embs, seed=42, max_intra_pairs_per_speaker=20,
+        )
+
+        assert r1["intra"]["values"] == r2["intra"]["values"]
+
+    def test_intra_no_limit_exhaustive(self):
+        """max_intra_pairs_per_speaker=0 disables sampling (exhaustive)."""
+        rng = np.random.RandomState(42)
+        speaker_embs = {
+            "spk_1": [rng.randn(192) for _ in range(10)],  # C(10,2)=45
+        }
+
+        result = compute_speaker_similarity_baseline(
+            speaker_embs, max_intra_pairs_per_speaker=0,
+        )
+        assert result["intra"]["n_pairs"] == 45
+
 
 # ===========================================================================
 # ssl.py tests (WavLM model fully mocked)

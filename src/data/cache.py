@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from src.data.manifest import ManifestEntry, compute_file_hash, read_manifest
+from src.data.manifest import ManifestEntry, compute_file_hash, read_manifest, write_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,23 @@ class PipelineCache:
             ValueError: If manifest is corrupt.
         """
         return read_manifest(self._manifest_path)
+
+    def save_manifest(self, entries: list[ManifestEntry]) -> str:
+        """Save manifest entries to cache (JSONL + SHA-256 sidecar).
+
+        Args:
+            entries: List of validated ManifestEntry objects.
+
+        Returns:
+            SHA-256 hex digest of the written manifest file.
+        """
+        self._base.mkdir(parents=True, exist_ok=True)
+        sha256 = write_manifest(entries, self._manifest_path)
+        logger.info(
+            f"Manifest cached: {len(entries)} entries → {self._manifest_path} "
+            f"(SHA-256: {sha256[:12]}...)"
+        )
+        return sha256
 
     def get_manifest_path(self) -> Path:
         """Return path where manifest should be written."""

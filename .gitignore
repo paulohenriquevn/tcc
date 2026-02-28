@@ -27,3 +27,5 @@ __pycache__
 .claude/tasks/
 .claude/memory/
 .claude/worktrees/
+
+token.txt

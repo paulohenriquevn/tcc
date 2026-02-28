@@ -99,11 +99,16 @@ def compute_cosine_similarity(emb_a: np.ndarray, emb_b: np.ndarray) -> float:
 def compute_speaker_similarity_baseline(
     speaker_embeddings: dict[str, list[np.ndarray]],
     seed: int = 42,
+    max_intra_pairs_per_speaker: int = 500,
 ) -> dict[str, dict]:
     """Compute intra-speaker and inter-speaker similarity baselines.
 
     Args:
         speaker_embeddings: Dict mapping speaker_id to list of embeddings.
+        seed: Random seed for reproducible sampling.
+        max_intra_pairs_per_speaker: Max pairs sampled per speaker for
+            intra-speaker similarity. Prevents O(n^2) explosion for speakers
+            with hundreds of utterances. Set to 0 for exhaustive (no limit).
 
     Returns:
         Dict with 'intra' and 'inter' similarity stats:
@@ -112,15 +117,26 @@ def compute_speaker_similarity_baseline(
             'inter': {'mean': float, 'std': float, 'values': list},
         }
     """
+    rng_intra = np.random.RandomState(seed)
+
     # Intra-speaker: similarity between different utterances of the same speaker
     intra_sims = []
     for speaker_id, embeddings in speaker_embeddings.items():
         if len(embeddings) < 2:
             continue
-        for i in range(len(embeddings)):
-            for j in range(i + 1, len(embeddings)):
+        n_possible = len(embeddings) * (len(embeddings) - 1) // 2
+        if max_intra_pairs_per_speaker > 0 and n_possible > max_intra_pairs_per_speaker:
+            # Sample random pairs to avoid O(n^2) explosion
+            for _ in range(max_intra_pairs_per_speaker):
+                i, j = rng_intra.choice(len(embeddings), size=2, replace=False)
                 sim = compute_cosine_similarity(embeddings[i], embeddings[j])
                 intra_sims.append(sim)
+        else:
+            # Exhaustive for small speakers
+            for i in range(len(embeddings)):
+                for j in range(i + 1, len(embeddings)):
+                    sim = compute_cosine_similarity(embeddings[i], embeddings[j])
+                    intra_sims.append(sim)
 
     # Inter-speaker: similarity between different speakers
     # Sample pairs to keep computation manageable
