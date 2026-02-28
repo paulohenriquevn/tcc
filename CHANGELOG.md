@@ -7,6 +7,16 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 ## [Unreleased]
 
 ### Changed
+- `acoustic.py`: pitch tracker alterado de `librosa.pyin` para `librosa.yin` (~10-50x mais rápido) — para estatísticas agregadas (média/std), YIN determinístico é adequado e reduz extração de 63h para ~1-3h (#25)
+- `manifest_builder.py`: iteração sequencial com raw bytes writing — evita random access Arrow + roundtrip decode/encode de áudio (#25)
+- Notebook `stage1_5`: células de extração (18-21) agora fazem checkpoint periódico a cada 10K items no Google Drive + suporte a resume de cache parcial — se sessão Colab morrer, progresso é preservado (#25)
+
+### Fixed
+- Notebook `stage1_5` cell-11: `TypeError` ao formatar `filter_stats` — chave `dropped_speakers` é lista, não número; agora pula valores não-numéricos (#26)
+- Notebook `stage1_5` cell-8: token HF hardcoded removido — restaurado `userdata.get('HF_TOKEN')` (#26)
+- Notebook `stage1_5` cells 20-21 (WavLM/Backbone): bug de cache per-layer — se qualquer camada faltava no cache, TODAS camadas eram descartadas e re-extraídas do zero (#25)
+
+### Changed
 - Estratégia "5 regiões, CO de CORAA-MUPE apenas": BrAccent removido do pipeline por não ser dataset HuggingFace; CO re-incluído via CORAA-MUPE (3 speakers) com `min_speakers_per_region` reduzido de 5 para 3 (mínimo científico para splits speaker-disjoint); CO excluído do Common Voice via `exclude_accents: ["CO"]` para evitar confound V=0.8791; CO documentado como análise secundária (não Gate-eligible, CI reportado separadamente); pipeline, config, notebook, dataset card e protocolo atualizados (#24)
 
 ### Added
