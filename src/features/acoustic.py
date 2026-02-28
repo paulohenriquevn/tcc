@@ -53,11 +53,12 @@ def extract_acoustic_features(
     mfcc_mean = np.mean(mfcc, axis=1)
     mfcc_std = np.std(mfcc, axis=1)
 
-    # Pitch (F0) via pyin
-    f0, voiced_flag, voiced_probs = librosa.pyin(
-        y, fmin=librosa.note_to_hz("C2"), fmax=librosa.note_to_hz("C7"), sr=sr
-    )
-    f0_voiced = f0[~np.isnan(f0)]
+    # Pitch (F0) via yin (deterministic, ~10-50x faster than pyin)
+    fmin = librosa.note_to_hz("C2")
+    fmax = librosa.note_to_hz("C7")
+    f0 = librosa.yin(y, fmin=fmin, fmax=fmax, sr=sr)
+    # Filter out-of-range estimates (yin returns fmin/fmax for unvoiced frames)
+    f0_voiced = f0[(f0 > fmin) & (f0 < fmax)]
     pitch_mean = float(np.mean(f0_voiced)) if len(f0_voiced) > 0 else 0.0
     pitch_std = float(np.std(f0_voiced)) if len(f0_voiced) > 0 else 0.0
 

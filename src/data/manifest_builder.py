@@ -7,8 +7,10 @@ This script is the ONLY entry point for data ingestion.
 All downstream code reads from the manifest, never from raw files.
 """
 
+import io
 import json
 import logging
+import struct
 from pathlib import Path
 from typing import Optional
 
@@ -385,16 +387,26 @@ def build_manifest_from_hf_dataset(
         f"passed metadata filters"
     )
 
-    # ── Phase 2: Decode audio and save (only filtered rows) ──
-    logger.info("Phase 2: Saving audio for filtered rows...")
+    # ── Phase 2: Save audio for filtered rows (raw bytes, no decode) ──
+    #
+    # Performance: HF datasets' __getitem__ with a single index does a
+    # per-row Arrow seek + full audio decode (~1.6s/item on CORAA-MUPE).
+    # Instead, we:
+    #   1. cast_column("audio", Audio(decode=False)) → raw bytes, no decode
+    #   2. enumerate() → sequential Arrow reads (batched internally)
+    #   3. Write raw WAV bytes directly → skip decode→encode roundtrip
+    # Result: ~0.01–0.05s/item instead of ~1.6s/item.
+    logger.info("Phase 2: Saving audio for filtered rows (raw bytes)...")
     filtered_ds = dataset.select(pass_indices)
+
+    from datasets import Audio as HFAudio
+
+    no_decode_ds = filtered_ds.cast_column("audio", HFAudio(decode=False))
 
     filtered = []
     seen_utt_ids: set[str] = set()
 
-    for i in range(len(filtered_ds)):
-        row = filtered_ds[i]
-
+    for i, row in enumerate(no_decode_ds):
         speaker_id = str(row["speaker_code"])
         duration = float(row["duration"])
         birth_state = normalize_birth_state(row["birth_state"])
@@ -402,8 +414,8 @@ def build_manifest_from_hf_dataset(
         accent = BIRTH_STATE_TO_MACRO_REGION[birth_state]
 
         # Derive utt_id from audio path, fall back to global index
-        audio_data = row["audio"]
-        audio_path_orig = audio_data.get("path", "")
+        audio_raw = row["audio"]
+        audio_path_orig = audio_raw.get("path", "")
         if audio_path_orig:
             utt_id = Path(audio_path_orig).stem
         else:
@@ -414,20 +426,31 @@ def build_manifest_from_hf_dataset(
             utt_id = f"{utt_id}_{pass_indices[i]:06d}"
         seen_utt_ids.add(utt_id)
 
-        # Save audio to WAV (skip if already exists from a previous build)
-        audio_sr = int(audio_data["sampling_rate"])
+        # Save audio (skip if already exists from a previous build)
+        raw_bytes = audio_raw["bytes"]
         wav_path = audio_output_dir / f"{utt_id}.wav"
+
         if not wav_path.exists():
             try:
-                sf.write(
-                    str(wav_path),
-                    audio_data["array"],
-                    audio_sr,
-                )
+                if raw_bytes[:4] == b"RIFF":
+                    # WAV format — direct byte copy (no decode/encode)
+                    wav_path.write_bytes(raw_bytes)
+                else:
+                    # Non-WAV (FLAC/MP3/etc): decode and re-encode as WAV
+                    data, sr = sf.read(io.BytesIO(raw_bytes))
+                    sf.write(str(wav_path), data, sr)
             except Exception as e:
                 filter_stats["rejected_audio_error"] += 1
                 logger.warning(f"Failed to save audio for {utt_id}: {e}")
                 continue
+
+        # Get sampling rate without full decode
+        if raw_bytes[:4] == b"RIFF":
+            # Standard WAV header: sample rate at bytes 24-27 (uint32 LE)
+            audio_sr = struct.unpack_from("<I", raw_bytes, 24)[0]
+        else:
+            # Fallback: read from the written file
+            audio_sr = sf.info(str(wav_path)).samplerate
 
         entry = ManifestEntry(
             utt_id=utt_id,
@@ -444,7 +467,7 @@ def build_manifest_from_hf_dataset(
         filtered.append(entry)
         filter_stats["accepted"] += 1
 
-        if filter_stats["accepted"] % 1000 == 0:
+        if filter_stats["accepted"] % 5000 == 0:
             logger.info(f"  Saved {filter_stats['accepted']} audio files...")
 
     logger.info(f"Phase 2 complete: {len(filtered)} entries with audio saved")
