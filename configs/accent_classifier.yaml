@@ -24,12 +24,7 @@ dataset:
       hf_id: "fsicoli/common_voice_17_0"  # community mirror — mozilla-foundation removed data Oct 2025
       hf_lang: "pt"
       manifest_path: null  # filled at runtime
-      exclude_accents: ["CO"]  # Exclude CO from CV to resolve source confound (#21)
-    - name: "BrAccent"
-      zip_path: "dataset/archive.zip"
-      real_only: true
-      include_co_remapping: true  # DF/GO speakers re-mapped from "Sulista" to CO
-      manifest_path: null  # filled at runtime
+      exclude_accents: ["CO"]  # CO excluded from CV to avoid source confound (V=0.8791); CO sourced from CORAA only (#24)
 
   combined_manifest_path: null  # filled at runtime
   combined_manifest_sha256: null  # filled at runtime
@@ -38,18 +33,19 @@ dataset:
     speaker_type: "R"  # interviewees only (same filter as stage1_5)
     min_duration_s: 3.0
     max_duration_s: 15.0
-    min_speakers_per_region: 5
+    min_speakers_per_region: 3
     min_utterances_per_speaker: 3
-    exclude_regions: []  # CO re-included via 3-source strategy (#21)
+    exclude_regions: []  # All 5 IBGE regions included (#24)
 
   accent_mapping: "ibge_macro_region"
-  # Strategy "5 regions with 3 sources" (decision 2026-02-27):
-  # CO previously excluded (V=0.8791) because 90% came from CommonVoice.
-  # Solution: exclude CO from CommonVoice + add BrAccent as 3rd source.
-  # CO now has 5 speakers: 3 CORAA-MUPE + 2 BrAccent (DF, GO re-mapped).
-  # Estimated V(accent×source) drops to ~0.14 (below 0.3 threshold).
-  # CO treated as secondary analysis: not Gate-eligible, CI reported separately.
-  # BrAccent contributes speakers to all 5 regions (NE, SE, S + 2 CO).
+  # Strategy "5 regions, CO from CORAA-MUPE only" (decision 2026-02-27):
+  # Only HuggingFace-hosted datasets are used (CORAA-MUPE + Common Voice PT).
+  # CO excluded from Common Voice (exclude_accents) to avoid source confound
+  # (V=0.8791 when CO came from CV). CO sourced solely from CORAA-MUPE (3 speakers).
+  # min_speakers_per_region lowered from 5 to 3 — the scientific minimum for
+  # speaker-disjoint splits (2 train + 1 test). CO = secondary analysis:
+  # not Gate-eligible, CI reported separately, wider confidence intervals expected.
+  # Remaining 4 regions (N, NE, SE, S) have 7-193 speakers each.
 
 # --- Splits ---
 splits:

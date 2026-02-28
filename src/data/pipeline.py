@@ -6,13 +6,11 @@ notebooks to avoid code duplication (DRY).
 
 This module is the single entry point for the full data pipeline.
 Individual steps remain in their respective modules (manifest_builder,
-cv_manifest_builder, braccent_manifest_builder, combined_manifest,
-splits, confounds).
+cv_manifest_builder, combined_manifest, splits, confounds).
 
 Architecture note: per-source builders receive min_speakers_per_region=0
 so they keep ALL regions. The region threshold is applied ONLY at the
 combine step, where speakers from multiple sources are aggregated.
-This enables the multi-source strategy (e.g. CORAA-CO 3 + BrAccent-CO 2 = 5).
 """
 
 import logging
@@ -81,8 +79,7 @@ def load_or_build_accents_dataset(
     on disk are reused (not re-downloaded) — only manifests are regenerated.
 
     Region filtering (min_speakers_per_region) is applied ONLY at the
-    combine step, not per-source. This allows multi-source speaker
-    aggregation (e.g. CORAA-CO 3 speakers + CV-CO 4 speakers = 7 combined).
+    combine step, not per-source.
 
     Args:
         config: Loaded accent_classifier.yaml config dict.
@@ -209,54 +206,6 @@ def load_or_build_accents_dataset(
             )
             print("  Accent metadata is sparse in CV-PT. Proceeding with CORAA-MUPE only.")
 
-    # --- 2.5. Load or build BrAccent manifest (if configured) ---
-    bra_manifest_path = None
-    bra_sources = [s for s in config["dataset"]["sources"] if s["name"] == "BrAccent"]
-    if bra_sources:
-        bra_cfg = bra_sources[0]
-        bra_dir = drive_base / "braccent"
-        bra_manifest_path = bra_dir / "manifest.jsonl"
-        bra_audio_dir = bra_dir / "audio"
-        bra_hash_path = bra_dir / ".filter_hash"
-
-        if _is_cache_valid(bra_manifest_path, bra_hash_path, filter_hash):
-            logger.info("Loading BrAccent from cache: %s", bra_manifest_path)
-            bra_entries = read_manifest(bra_manifest_path)
-            bra_sha = compute_file_hash(bra_manifest_path)
-            print(f"BrAccent: {len(bra_entries):,} entries (cached, SHA: {bra_sha[:16]}...)")
-        else:
-            if bra_manifest_path.exists():
-                logger.info(
-                    "BrAccent manifest cache stale (filter hash mismatch). "
-                    "Rebuilding manifest (audio files on disk are reused)..."
-                )
-
-            from src.data.braccent_manifest_builder import build_manifest_from_braccent
-
-            zip_path = Path(bra_cfg["zip_path"])
-            bra_entries, bra_stats = build_manifest_from_braccent(
-                zip_path=zip_path,
-                audio_output_dir=bra_audio_dir,
-                manifest_output_path=bra_manifest_path,
-                min_duration_s=config["dataset"]["filters"]["min_duration_s"],
-                max_duration_s=config["dataset"]["filters"]["max_duration_s"],
-                min_speakers_per_region=0,  # Deferred to combine step
-                min_utterances_per_speaker=min_utt_spk,
-                include_co_remapping=bra_cfg.get("include_co_remapping", True),
-            )
-            _write_cache_hash(bra_hash_path, filter_hash)
-            if bra_entries:
-                bra_sha = bra_stats["manifest_sha256"]
-                print(
-                    f"BrAccent: {len(bra_entries):,} entries, "
-                    f"SHA-256: {bra_sha}"
-                )
-            else:
-                print(
-                    "BrAccent: 0 usable entries "
-                    f"(filter stats: {bra_stats['filter_stats']})"
-                )
-
     # --- 3. Combine manifests ---
     combined_dir = drive_base / "accents_pt_br"
     combined_manifest_path = combined_dir / "manifest.jsonl"
@@ -266,16 +215,11 @@ def load_or_build_accents_dataset(
     # Any source manifest change or filter config change invalidates it.
     coraa_sha = compute_file_hash(coraa_manifest_path)
     cv_sha = compute_file_hash(cv_manifest_path) if cv_manifest_path.exists() else "none"
-    bra_sha_for_key = (
-        compute_file_hash(bra_manifest_path) if bra_manifest_path and bra_manifest_path.exists() else "none"
-    )
-    combined_cache_key = f"{filter_hash}_{coraa_sha[:12]}_{cv_sha[:12]}_{bra_sha_for_key[:12]}"
+    combined_cache_key = f"{filter_hash}_{coraa_sha[:12]}_{cv_sha[:12]}"
 
     manifests_to_combine = [(coraa_manifest_path, "CORAA-MUPE")]
     if cv_manifest_path.exists():
         manifests_to_combine.append((cv_manifest_path, "CommonVoice-PT"))
-    if bra_manifest_path and bra_manifest_path.exists():
-        manifests_to_combine.append((bra_manifest_path, "BrAccent"))
 
     if _is_cache_valid(combined_manifest_path, combined_hash_path, combined_cache_key):
         logger.info("Loading combined manifest from cache: %s", combined_manifest_path)

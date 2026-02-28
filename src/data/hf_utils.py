@@ -156,27 +156,26 @@ in accent-controllable TTS research.
 
 ## Dataset Description
 
-**Accents-PT-BR** combines three complementary sources of Brazilian Portuguese speech:
+**Accents-PT-BR** combines two complementary sources of Brazilian Portuguese speech:
 
 | Source | Type | Accent label origin |
 |--------|------|--------------------|
 | [CORAA-MUPE-ASR](https://huggingface.co/datasets/nilc-nlp/CORAA-MUPE-ASR) | Professional interviews | `birth_state` field (verified) |
-| [Common Voice PT](https://commonvoice.mozilla.org/pt) (v17.0) | Crowd-sourced read speech | User-submitted `accent` field (noisy, CO excluded) |
-| BrAccent (Fake BrAccent corpus) | Regional accent recordings | Folder label (perceived accent) + CO re-mapping (DF/GO) |
+| [Common Voice PT](https://commonvoice.mozilla.org/pt) (v17.0) | Crowd-sourced read speech | User-submitted `accent` field (noisy) |
 
 Accent labels are normalized to **IBGE macro-regions**: N (Norte), NE (Nordeste), CO (Centro-Oeste),
-SE (Sudeste), S (Sul).
+SE (Sudeste), S (Sul). CO is sourced exclusively from CORAA-MUPE (3 speakers) and treated as
+secondary analysis with wider confidence intervals.
 
 ### Key Properties
 
 - **Speaker-disjoint splits**: No speaker appears in more than one split (train/validation/test).
   This is critical for fair evaluation of accent classifiers.
-- **Source-prefixed IDs**: Entries use distinct ID namespaces per source
-  (`cv_` for Common Voice, `bra_` for BrAccent) to prevent collisions.
-- **Multi-source (3 sources)**: Enables cross-source evaluation to detect source confounds
+- **Source-prefixed IDs**: Common Voice entries use `cv_` prefix to prevent ID collisions.
+- **Multi-source (2 sources)**: Enables cross-source evaluation to detect source confounds
   (classifier learning recording conditions instead of accent).
-- **CO strategy**: CO region sourced from CORAA-MUPE + BrAccent only (CO excluded from
-  Common Voice to resolve accent x source confound).
+- **CO secondary analysis**: CO region has only 3 speakers (from CORAA-MUPE); excluded from
+  Common Voice to avoid source confound. CO is not Gate-eligible; CI reported separately.
 - **All audio at 16 kHz mono WAV**.
 
 ## Dataset Statistics
@@ -201,7 +200,6 @@ SE (Sudeste), S (Sul).
 |--------|------------|
 | CORAA-MUPE | {source_stats.get('CORAA-MUPE', 0):,} |
 | CommonVoice-PT | {source_stats.get('CommonVoice-PT', 0):,} |
-| BrAccent | {source_stats.get('BrAccent', 0):,} |
 
 ### Splits (Speaker-Disjoint)
 
@@ -225,7 +223,7 @@ Mandatory confound checks were run before publication:
 |-------|------|-------------|
 | `audio` | Audio (16kHz) | Audio waveform |
 | `utt_id` | string | Unique utterance identifier |
-| `speaker_id` | string | Speaker identifier (unique per person; prefixed: `cv_` Common Voice, `bra_` BrAccent) |
+| `speaker_id` | string | Speaker identifier (unique per person; `cv_` prefix for Common Voice) |
 | `accent` | ClassLabel | IBGE macro-region: {accent_labels} |
 | `gender` | ClassLabel | Speaker gender: {gender_labels} |
 | `duration_s` | float32 | Duration in seconds |
@@ -267,9 +265,10 @@ It is NOT intended for:
 - **Common Voice labels are noisy**: User-submitted, not verified.
 - **Source confound risk**: Different recording conditions between sources.
   Cross-source evaluation is recommended.
-- **Class imbalance**: Some regions (N, CO) may have fewer speakers.
-- **CO re-mapping**: CO uses birth_state (DF/GO) from BrAccent instead of folder label.
-  CO is treated as secondary analysis (not Gate-eligible, CI reported separately).
+- **Class imbalance**: Some regions (N, CO) have fewer speakers than others.
+- **CO limitations**: Only 3 speakers from CORAA-MUPE (CO excluded from Common Voice to
+  avoid accent x source confound). CO is treated as secondary analysis with wider CI.
+  Results for CO should not be compared directly to other regions.
 
 ## Citation
 
@@ -277,7 +276,6 @@ If you use this dataset, please cite the underlying sources:
 
 - **CORAA-MUPE**: Candido Jr. et al. (2023). CORAA: a large corpus of spontaneous and prepared speech.
 - **Common Voice**: Ardila et al. (2020). Common Voice: A Massively-Multilingual Speech Corpus.
-- **BrAccent**: Fake BrAccent corpus — regional accent recordings for Brazilian Portuguese.
 
 ## Provenance
 

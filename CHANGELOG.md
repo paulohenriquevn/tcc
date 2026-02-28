@@ -6,15 +6,13 @@ Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) + [Semantic
 
 ## [Unreleased]
 
-### Added
-- `braccent_manifest_builder.py`: novo builder para o dataset Fake BrAccent — extrai REAL WAVs do archive.zip, parseia metadata dos filenames, mapeia para macro-regiões IBGE via rótulo de pasta (sotaque percebido) com re-mapeamento de DF/GO para CO via birth_state (#21)
-- Parâmetro `exclude_accents` em `build_manifest_from_common_voice()` — permite excluir regiões IBGE específicas de uma fonte (usado para remover CO do Common Voice, eliminando confound accent×source) (#21)
-- BrAccent como 3ª fonte no pipeline (`pipeline.py` Step 2.5) com cache independente, integração ao combined manifest e invalidação de cache (#21)
-- 19 testes para BrAccent builder: parsing de filename, mapeamentos, CO re-mapping, integração com zip sintético (#21)
-
 ### Changed
-- Notebook `accents_pt_br_dataset`: documentação atualizada para 3 fontes (CORAA-MUPE + Common Voice + BrAccent), token HF movido para Colab Secrets (era hardcoded), cells redundantes de auth check removidas (3→1), "quick load test" do CV substituído por verificação de pré-requisitos do BrAccent (#22)
-- `hf_utils.py`: dataset card atualizado para 3 fontes — tabela de sources, distribuição, prefixos de IDs (`bra_`), estratégia CO, limitações e citações incluem BrAccent (#22)
+- Estratégia "5 regiões, CO de CORAA-MUPE apenas": BrAccent removido do pipeline por não ser dataset HuggingFace; CO re-incluído via CORAA-MUPE (3 speakers) com `min_speakers_per_region` reduzido de 5 para 3 (mínimo científico para splits speaker-disjoint); CO excluído do Common Voice via `exclude_accents: ["CO"]` para evitar confound V=0.8791; CO documentado como análise secundária (não Gate-eligible, CI reportado separadamente); pipeline, config, notebook, dataset card e protocolo atualizados (#24)
+
+### Added
+- `braccent_manifest_builder.py`: builder para o dataset Fake BrAccent — mantido no repositório mas não integrado ao pipeline (não é fonte HuggingFace) (#21)
+- Parâmetro `exclude_accents` em `build_manifest_from_common_voice()` — permite excluir regiões IBGE específicas de uma fonte (#21)
+- 19 testes para BrAccent builder: parsing de filename, mapeamentos, CO re-mapping, integração com zip sintético (#21)
 
 ### Added
 - Parâmetro `exclude_regions` em `combine_manifests()` e config YAML — permite excluir macro-regiões IBGE do pipeline com invalidação automática de cache (#20)

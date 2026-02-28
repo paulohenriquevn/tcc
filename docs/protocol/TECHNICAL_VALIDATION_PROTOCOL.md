@@ -76,15 +76,20 @@ Audio = TTS(texto, S, A)
     - CO: 4 speakers / 18.247 utt
     - SE: 48 speakers / 7.396 utt
     - S: 16 speakers / 14.020 utt
-  - **Combinado (CORAA-MUPE + Common Voice):**
+  - **Combinado (CORAA-MUPE + Common Voice, CO excluído do CV):**
     - N: ~33 speakers — **PASS**
     - NE: ~59 speakers — **PASS**
-    - CO: ~7 speakers — **PASS** (marginal, CI mais largo esperado)
+    - CO: 3 speakers (CORAA-MUPE only) — **PASS** (secondary analysis)
     - SE: ~241 speakers — **PASS**
     - S: ~23 speakers — **PASS**
-- **Estratégia multi-source:** Common Voice contribui speakers para todas as 5 regiões, não apenas CO. Isso dilui a correlação accent×source — o classificador não pode aprender "qual dataset" em vez de "qual sotaque". Cross-source evaluation obrigatória (§ confounds);
-- **Configuração adotada:** 5 macro-regiões (N, NE, CO, SE, S) com `min_speakers_per_region=5`;
-- **Caveats CO:** menor número de speakers (7 combinados), gender imbalance severo (~99% M no CV), CI mais largo que outras regiões. Documentado como região com menor robustez estatística;
+- **Estratégia "5 regiões, CO de CORAA-MUPE apenas" (decisão 2026-02-27):**
+  - Apenas datasets HuggingFace são utilizados (CORAA-MUPE + Common Voice PT);
+  - CO excluído do Common Voice para evitar confound accent×source (V=0.8791 quando CO vinha do CV);
+  - CO sourced exclusivamente do CORAA-MUPE (3 speakers, 1.406 utt);
+  - `min_speakers_per_region` reduzido de 5 para 3 — mínimo científico para splits speaker-disjoint (2 train + 1 test);
+  - Common Voice contribui speakers para N, NE, SE, S. Cross-source evaluation obrigatória;
+- **Configuração adotada:** 5 macro-regiões (N, NE, CO, SE, S) com `min_speakers_per_region=3`;
+- **Caveats CO:** apenas 3 speakers (CORAA-MUPE), CO é análise secundária (não Gate-eligible), CI reportado separadamente, intervalos de confiança mais largos que outras regiões;
 - Confound accent×source monitorado via chi-quadrado + Cramer's V (threshold blocker: V ≥ 0.3);
 - Decisão de manter ou reduzir classes é tomada após análise de distribuição no manifest combinado.
 
